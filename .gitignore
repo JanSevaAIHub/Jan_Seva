@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-ssr/
+.venv/
+.tmp/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.env
+.env.*
+!.env.example
+coverage/
+.DS_Store
+
