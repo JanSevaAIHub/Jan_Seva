@@ -4,7 +4,7 @@ Independent citizen-assistance prototype for discovering verified public schemes
 
 ## Monorepo
 
-- `apps/web` — React, TypeScript, Vite citizen and officer interface.
+- `apps/web` — React, JavaScript, Vite citizen and officer interface.
 - `services/api` — FastAPI service and AI workflows.
 - `data` — reviewed scheme sources and synthetic demo records.
 - `docs` — architecture, API contract, and demo notes.

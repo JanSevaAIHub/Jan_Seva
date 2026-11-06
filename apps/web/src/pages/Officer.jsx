@@ -1,0 +1,481 @@
+import { useState } from 'react'
+import {
+  ShieldCheck,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  GitBranch,
+  Layers,
+  Sparkles,
+  ArrowRight,
+  Filter,
+  Check,
+  Building,
+  Calendar,
+  MoreVertical,
+  ExternalLink,
+  ChevronDown
+} from 'lucide-react'
+import { useApp } from '../context/AppContext'
+import { OFFICER_KPIS } from '../data/mockData'
+
+export function Officer() {
+  const {
+    currentUser,
+    switchUserRole,
+    complaints,
+    setOfficerTicketModal,
+    routingItems,
+    handleRouteAction,
+    addToast
+  } = useApp()
+
+  const [deptFilter, setDeptFilter] = useState('Urban Development Dept')
+  const [timeFilter, setTimeFilter] = useState('Last 30 Days')
+  const [hoveredTrendIndex, setHoveredTrendIndex] = useState(null)
+  const [selectedTicketId, setSelectedTicketId] = useState(null)
+
+  // Trend Data for SVG chart
+  const trendPoints = [
+    { label: 'Dec 22', received: 420, resolved: 360 },
+    { label: 'Dec 29', received: 580, resolved: 490 },
+    { label: 'Jan 5', received: 720, resolved: 650 },
+    { label: 'Jan 12', received: 890, resolved: 780 },
+    { label: 'Jan 19', received: 1248, resolved: 940 },
+  ]
+
+  // Category breakdown for Donut Chart
+  const categories = [
+    { name: 'Water Supply', pct: 24, color: '#3b82f6' },
+    { name: 'Streetlight', pct: 20, color: '#8b5cf6' },
+    { name: 'Roads', pct: 18, color: '#f59e0b' },
+    { name: 'Sanitation', pct: 14, color: '#10b981' },
+    { name: 'Others', pct: 24, color: '#94a3b8' },
+  ]
+
+  return (
+    <div className="space-y-5">
+      {/* Header and Filter Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+              OFFICER INTERNAL CONSOLE
+            </span>
+            <span className="text-xs text-slate-400">Simulated Nodal Role</span>
+          </div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            Officer Dashboard
+          </h1>
+          <p className="text-xs text-slate-500">
+            Manage citizen requests, streamline department resolution, and monitor service performance.
+          </p>
+        </div>
+
+        {/* Right filter dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={deptFilter}
+            onChange={e => setDeptFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none shadow-sm"
+          >
+            <option value="Urban Development Dept">Dept: Urban Development</option>
+            <option value="Sanitation Dept">Dept: Sanitation</option>
+            <option value="Roads & Transport">Dept: Roads &amp; Transport</option>
+            <option value="Water Supply">Dept: Water Supply</option>
+          </select>
+
+          <select
+            value={timeFilter}
+            onChange={e => setTimeFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none shadow-sm"
+          >
+            <option value="Last 30 Days">Last 30 Days</option>
+            <option value="Last 7 Days">Last 7 Days</option>
+            <option value="This Quarter">This Quarter</option>
+          </select>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200/80 text-xs font-bold text-indigo-800">
+            <ShieldCheck size={14} className="text-indigo-600" />
+            <span>R. Singh (Officer)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5 Top KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Total Requests</span>
+            <span className="p-1 rounded-lg bg-blue-50 text-blue-600"><Layers size={15} /></span>
+          </div>
+          <div className="text-2xl font-black text-slate-900">{OFFICER_KPIS.totalRequests.toLocaleString()}</div>
+          <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
+            <span>↑ {OFFICER_KPIS.totalChange}</span>
+            <span className="text-slate-400 font-normal ml-1">vs last month</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Pending Review</span>
+            <span className="p-1 rounded-lg bg-amber-50 text-amber-600"><Clock size={15} /></span>
+          </div>
+          <div className="text-2xl font-black text-slate-900">{OFFICER_KPIS.pendingReview}</div>
+          <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
+            <span>↓ {OFFICER_KPIS.pendingChange}</span>
+            <span className="text-slate-400 font-normal ml-1">backlog cleared</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>In Progress</span>
+            <span className="p-1 rounded-lg bg-teal-50 text-teal-600"><GitBranch size={15} /></span>
+          </div>
+          <div className="text-2xl font-black text-slate-900">{OFFICER_KPIS.inProgress}</div>
+          <div className="text-[11px] font-bold text-indigo-600 flex items-center gap-0.5">
+            <span>↑ {OFFICER_KPIS.inProgressChange}</span>
+            <span className="text-slate-400 font-normal ml-1">active dispatches</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Resolved</span>
+            <span className="p-1 rounded-lg bg-emerald-50 text-emerald-600"><CheckCircle2 size={15} /></span>
+          </div>
+          <div className="text-2xl font-black text-slate-900">{OFFICER_KPIS.resolved}</div>
+          <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
+            <span>↑ {OFFICER_KPIS.resolvedChange}</span>
+            <span className="text-slate-400 font-normal ml-1">resolution rate</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1 col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>SLA Compliance</span>
+            <span className="p-1 rounded-lg bg-violet-50 text-violet-600"><TrendingUp size={15} /></span>
+          </div>
+          <div className="text-2xl font-black text-slate-900">{OFFICER_KPIS.slaCompliance}%</div>
+          <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
+            <span>↑ {OFFICER_KPIS.slaChange}</span>
+            <span className="text-slate-400 font-normal ml-1">target 90%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Row: Trend Chart (Left), Category Donut (Middle), AI Duplicates (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Trend Chart (5 cols) */}
+        <div className="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Requests Trend</h3>
+              <p className="text-[11px] text-slate-400">Received vs. Resolved trajectory</p>
+            </div>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className="flex items-center gap-1 text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-violet-600" /> Received
+              </span>
+              <span className="flex items-center gap-1 text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-500" /> Resolved
+              </span>
+            </div>
+          </div>
+
+          {/* Interactive SVG Line Graph */}
+          <div className="relative pt-2">
+            <svg viewBox="0 0 400 160" className="w-full h-44 overflow-visible">
+              {/* Grid Lines */}
+              <line x1="30" y1="20" x2="390" y2="20" stroke="#f1f5f9" strokeDasharray="3 3" />
+              <line x1="30" y1="60" x2="390" y2="60" stroke="#f1f5f9" strokeDasharray="3 3" />
+              <line x1="30" y1="100" x2="390" y2="100" stroke="#f1f5f9" strokeDasharray="3 3" />
+              <line x1="30" y1="140" x2="390" y2="140" stroke="#e2e8f0" />
+
+              {/* Y Axis labels */}
+              <text x="5" y="24" fontSize="9" fill="#94a3b8">1200</text>
+              <text x="5" y="64" fontSize="9" fill="#94a3b8">800</text>
+              <text x="5" y="104" fontSize="9" fill="#94a3b8">400</text>
+              <text x="15" y="144" fontSize="9" fill="#94a3b8">0</text>
+
+              {/* Line 1: Received (Violet) */}
+              <path
+                d="M 50 115 Q 120 90, 190 70 T 320 40 T 370 20"
+                fill="none"
+                stroke="#6552ce"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+
+              {/* Line 2: Resolved (Teal) */}
+              <path
+                d="M 50 125 Q 120 105, 190 85 T 320 60 T 370 45"
+                fill="none"
+                stroke="#00a8a0"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+
+              {/* Points */}
+              {trendPoints.map((pt, i) => {
+                const cx = 50 + i * 80
+                return (
+                  <g key={pt.label} className="cursor-pointer">
+                    <circle cx={cx} cy={115 - i * 23} r="4" fill="#6552ce" stroke="#fff" strokeWidth="2" />
+                    <circle cx={cx} cy={125 - i * 20} r="4" fill="#00a8a0" stroke="#fff" strokeWidth="2" />
+                    <text x={cx} y="155" textAnchor="middle" fontSize="9" fill="#64748b">{pt.label}</text>
+                  </g>
+                )
+              })}
+            </svg>
+          </div>
+        </div>
+
+        {/* Requests by Category Donut Chart (4 cols) */}
+        <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Requests by Category</h3>
+            <p className="text-[11px] text-slate-400">Total volume distribution</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 pt-1">
+            {/* SVG Donut */}
+            <div className="relative w-36 h-36 flex-none flex items-center justify-center">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" strokeWidth="14" />
+                {/* Segment 1: Water Supply (24%) */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#3b82f6" strokeWidth="14"
+                  strokeDasharray="57.3 238.7" strokeDashoffset="0" />
+                {/* Segment 2: Streetlight (20%) */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#8b5cf6" strokeWidth="14"
+                  strokeDasharray="47.7 238.7" strokeDashoffset="-57.3" />
+                {/* Segment 3: Roads (18%) */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" strokeWidth="14"
+                  strokeDasharray="42.9 238.7" strokeDashoffset="-105" />
+                {/* Segment 4: Sanitation (14%) */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#10b981" strokeWidth="14"
+                  strokeDasharray="33.4 238.7" strokeDashoffset="-147.9" />
+                {/* Segment 5: Others (24%) */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#94a3b8" strokeWidth="14"
+                  strokeDasharray="57.3 238.7" strokeDashoffset="-181.3" />
+              </svg>
+              <div className="absolute flex flex-col items-center">
+                <span className="text-xs font-black text-slate-900 leading-tight">1,248</span>
+                <span className="text-[9px] text-slate-400 font-medium">Total</span>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="space-y-1.5 text-xs flex-1">
+              {categories.map(c => (
+                <div key={c.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                    <span className="text-slate-700 text-[11px]">{c.name}</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-800">{c.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Duplicate Detection Card (3 cols) */}
+        <div className="lg:col-span-3 bg-gradient-to-br from-indigo-900 via-violet-900 to-slate-900 p-5 rounded-2xl text-white shadow-sm flex flex-col justify-between space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="p-2 rounded-xl bg-white/10 text-teal-300">
+                <Sparkles size={18} />
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-300 font-bold">
+                Cosine Match
+              </span>
+            </div>
+            <h3 className="text-sm font-bold tracking-tight">AI Duplicate Detection</h3>
+            <p className="text-xs text-violet-200 leading-relaxed">
+              42 potential duplicate requests across 17 cluster cases in Urban Development.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            <div className="text-[11px] text-slate-300">
+              Merge redundant tickets to save field technician travel hours.
+            </div>
+            <button
+              onClick={() => addToast('Filtering table for 42 potential duplicates', 'info')}
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white text-violet-900 hover:bg-violet-50 text-xs font-bold transition-all shadow-md active:scale-95"
+            >
+              <span>Review Duplicates</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Third Row: Department Routing AI + SLA Progress + AI Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Department Routing AI Recommendation */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Department Routing (AI)
+            </h3>
+            <span className="text-[10px] text-violet-600 font-bold bg-violet-50 px-2 py-0.5 rounded-full">
+              Automated Triage
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {routingItems.map(item => (
+              <div key={item.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                <div>
+                  <div className="font-bold text-slate-800">{item.issue}</div>
+                  <div className="text-[10px] text-slate-500">
+                    &rarr; {item.targetDept} <span className="text-teal-600 font-bold">({item.confidence}%)</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRouteAction(item.id, item.targetDept)}
+                  className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-semibold transition-all"
+                >
+                  Route
+                </button>
+              </div>
+            ))}
+            {routingItems.length === 0 && (
+              <div className="p-4 text-center text-xs text-slate-400">All suggestions routed!</div>
+            )}
+          </div>
+        </div>
+
+        {/* SLA Progress */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            SLA Progress
+          </h3>
+
+          <div className="space-y-3 pt-1">
+            <div>
+              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>&lt; 24 hours</span>
+                <span className="text-emerald-700 font-bold">91%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '91%' }} />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>&le; 3 days</span>
+                <span className="text-emerald-700 font-bold">95%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="bg-teal-500 h-full rounded-full" style={{ width: '95%' }} />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>&le; 7 days</span>
+                <span className="text-violet-700 font-bold">88%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="bg-violet-600 h-full rounded-full" style={{ width: '88%' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Insights Card */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <Sparkles size={15} className="text-violet-600" />
+            <span>AI Operational Insights</span>
+          </div>
+
+          <ul className="space-y-2.5 text-xs text-slate-600 leading-relaxed pt-1">
+            <li className="flex items-start gap-2">
+              <span className="text-violet-600 font-bold">•</span>
+              <span><strong>+18% increase</strong> in streetlight complaints this week near Ward 12.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-teal-600 font-bold">•</span>
+              <span><strong>27 requests</strong> can be auto-closed via junior field inspection receipts.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-600 font-bold">•</span>
+              <span>Routing to Urban Infrastructure can improve overall municipal SLA by ~14%.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Bottom Table: Pending Review (27) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 px-5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Pending Review ({complaints.length})</h3>
+            <p className="text-xs text-slate-500">Review tickets, manage duplicates, and perform status updates</p>
+          </div>
+          <button
+            onClick={() => addToast('Displaying all active tickets', 'info')}
+            className="text-xs font-bold text-violet-600 hover:text-violet-800"
+          >
+            View All &rarr;
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+              <tr>
+                <th className="py-3 px-4">Request ID</th>
+                <th className="py-3 px-4">Issue Description</th>
+                <th className="py-3 px-4">Location</th>
+                <th className="py-3 px-4">Priority</th>
+                <th className="py-3 px-4">Local Status</th>
+                <th className="py-3 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {complaints.map(t => (
+                <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-700">{t.id}</td>
+                  <td className="py-3.5 px-4 font-medium text-slate-900 max-w-xs truncate">{t.title}</td>
+                  <td className="py-3.5 px-4 text-slate-600">{t.locality.split(',')[0]}</td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      t.priority === 'High' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {t.priority}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' :
+                      t.status === 'IN_PROGRESS' ? 'bg-teal-100 text-teal-800' :
+                      'bg-slate-100 text-slate-700'
+                    }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => setOfficerTicketModal(t)}
+                      className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-violet-600 hover:text-white text-slate-700 font-semibold transition-all"
+                    >
+                      Audit / Review
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

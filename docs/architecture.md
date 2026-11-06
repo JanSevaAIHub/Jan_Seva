@@ -3,7 +3,7 @@
 ## MVP deployment shape
 
 ```text
-React + TypeScript + Vite
+React + JavaScript + Vite
         | HTTPS + Supabase bearer JWT
         v
 FastAPI (validation, auth, REST, narrowly scoped LangGraph tools)
@@ -18,7 +18,7 @@ The frontend owns presentation, forms, and user confirmation. FastAPI validates 
 
 - Developer A: `apps/web/**`, `services/api/app/ai/**`, verified scheme source set and retrieval workflow.
 - Developer B: `services/api/app/{auth,config,db,models,schemas}.py`, `services/api/app/routers/**` except agent integration, migrations, complaint/officer APIs, and synthetic data.
-- Shared interfaces: `docs/api-contract.md` and `apps/web/src/lib/types.ts`. Change the contract first, then coordinate implementation.
+- Shared API contract: `docs/api-contract.md`. Frontend requests and responses are ordinary JavaScript objects; change the contract first, then coordinate implementation.
 
 ## Security and data boundaries
 
