@@ -24,7 +24,7 @@ export function complaintView(record) {
     officialRef: record.official_ref, officialStatus: record.official_status,
     submittedAt: new Date(record.created_at).toLocaleString(),
     priority: 'Not assessed', department: record.assigned_officer_id ? 'Assigned officer' : 'Awaiting assignment',
-    expectedResolution: 'Not estimated', officerNotes: events.filter(e => e.old_status !== null).at(-1)?.note,
+    expectedResolution: 'Not estimated', officerNotes: events.filter(e => e.old_status !== null && e.old_status !== e.new_status).at(-1)?.note,
     timeline: events.map((event, index) => ({
       step: event.old_status === event.new_status ? 'Filing reference recorded (user reported)' : event.new_status.replaceAll('_', ' '),
       time: new Date(event.event_time).toLocaleString(),

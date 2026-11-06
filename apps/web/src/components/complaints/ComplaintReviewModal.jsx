@@ -1,8 +1,10 @@
 import { X, ShieldAlert, ArrowRight, CheckCircle2, Building, MapPin, Tag } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useDialog } from '../../lib/useDialog'
 
 export function ComplaintReviewModal() {
   const { reviewModalComplaint, setReviewModalComplaint, addComplaint, complaintSaving, complaintSaveError, session, switchUserRole } = useApp()
+  const dialogRef = useDialog(Boolean(reviewModalComplaint), () => setReviewModalComplaint(null), complaintSaving)
 
   if (!reviewModalComplaint) return null
 
@@ -16,6 +18,8 @@ export function ComplaintReviewModal() {
       <div 
         className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
       >
         {/* Header */}
@@ -27,6 +31,7 @@ export function ComplaintReviewModal() {
             <h2 className="text-base font-bold text-slate-900">Review Before Submission</h2>
           </div>
           <button
+            aria-label="Close complaint review"
             onClick={() => setReviewModalComplaint(null)}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
           >

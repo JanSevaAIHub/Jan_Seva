@@ -16,7 +16,9 @@ export function AppProvider({ children }) {
   const [authError, setAuthError] = useState('')
   const [loginRole, setLoginRole] = useState(null)
   const accountVersion = useRef(0)
+  const identityVersion = useRef(0)
   const listVersion = useRef(0)
+  const complaintRevision = useRef(0)
   const sessionUser = useRef(null)
   const sessionToken = useRef(undefined)
   const [selectedState, setSelectedState] = useState('Punjab')
@@ -54,8 +56,17 @@ export function AppProvider({ children }) {
   const [schemesError, setSchemesError] = useState('')
   const [schemeChatError, setSchemeChatError] = useState('')
   const schemeChatBusy = useRef(false)
+  const schemeChatVersion = useRef(0)
   const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
+
+  const clearSchemeChat = useCallback(() => {
+    schemeChatVersion.current += 1
+    schemeChatBusy.current = false
+    setChatMessages([])
+    setSchemeChatError('')
+    setIsAiTyping(false)
+  }, [])
 
   // Add toast notification
   const addToast = (message, type = 'success') => {
@@ -78,7 +89,9 @@ export function AppProvider({ children }) {
   }
 
   const clearAccount = useCallback(() => {
+    clearSchemeChat()
     accountVersion.current += 1
+    identityVersion.current += 1
     sessionUser.current = null
     sessionToken.current = null
     setSession(null)
@@ -92,7 +105,7 @@ export function AppProvider({ children }) {
     setToasts([])
     setAuthLoading(false)
     setComplaintsLoading(false)
-  }, [])
+  }, [clearSchemeChat])
 
   useEffect(() => onUnauthorized(failedToken => {
     if (failedToken !== sessionToken.current) return
@@ -116,6 +129,8 @@ export function AppProvider({ children }) {
       sessionToken.current = token
       accountVersion.current += 1
       if (sessionUser.current !== nextSession?.user.id) {
+        identityVersion.current += 1
+        clearSchemeChat()
         sessionUser.current = nextSession?.user.id || null
         setCurrentUser(GUEST)
         setComplaints([])
@@ -133,10 +148,11 @@ export function AppProvider({ children }) {
       if (!nextSession) setComplaintsLoading(false)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [clearSchemeChat])
 
   const applyComplaint = saved => {
     const ticket = complaintView(saved)
+    complaintRevision.current += 1
     setComplaints(prev => [ticket, ...prev.filter(c => c.id !== ticket.id)])
     setActiveComplaint(prev => !prev || prev.id === ticket.id ? ticket : prev)
     setOfficerTicketModal(prev => prev?.id === ticket.id ? ticket : prev)
@@ -145,9 +161,10 @@ export function AppProvider({ children }) {
   }
 
   const refreshComplaints = useCallback(async () => {
-    if (!session) return
+    if (!session || session.access_token !== sessionToken.current) return
     const version = accountVersion.current
     const request = ++listVersion.current
+    const revision = complaintRevision.current
     const isCurrent = () => version === accountVersion.current && request === listVersion.current
     setComplaintsLoading(true)
     setComplaintsError('')
@@ -164,6 +181,9 @@ export function AppProvider({ children }) {
       if (!isCurrent()) return
       if (!Array.isArray(records)) throw new Error('The API returned an invalid complaint list. Please retry.')
       const tickets = records.map(complaintView)
+      // A detail or write completed after this list began. Its newer record
+      // must survive an older database snapshot returned by this request.
+      if (revision !== complaintRevision.current) return
       setComplaints(tickets)
       setActiveComplaint(prev => tickets.find(t => t.id === prev?.id) || tickets[0] || null)
       setOfficerTicketModal(prev => prev ? tickets.find(t => t.id === prev.id) || null : null)
@@ -203,31 +223,31 @@ export function AppProvider({ children }) {
 
   const addComplaint = async draft => {
     if (complaintSaving) return null
-    const version = accountVersion.current
+    const version = identityVersion.current
     setComplaintSaving(true)
     setComplaintSaveError('')
     try {
       const saved = await apiRequest('/complaints', session?.access_token, {
         method: 'POST', body: JSON.stringify(complaintInput(draft)),
       })
-      if (version !== accountVersion.current) return null
+      if (version !== identityVersion.current) return null
       const ticket = applyComplaint(saved)
       setActiveComplaint(ticket)
       addToast(`Internal ticket saved: ${ticket.id}`, 'success')
       await refreshComplaints()
-      return version === accountVersion.current ? ticket : null
+      return version === identityVersion.current ? ticket : null
     } catch (error) {
-      if (version === accountVersion.current) setComplaintSaveError(error.message)
+      if (version === identityVersion.current) setComplaintSaveError(error.message)
       return null
     } finally { setComplaintSaving(false) }
   }
 
   const updateComplaintStatus = async (ticketId, status, note = '') => {
-    const version = accountVersion.current
+    const version = identityVersion.current
     const saved = await apiRequest(`/officer/complaints/${ticketId}`, session?.access_token, {
       method: 'PATCH', body: JSON.stringify({ status, ...(note.trim() ? { note: note.trim() } : {}) }),
     })
-    if (version !== accountVersion.current) throw new Error('The account changed. Please reopen the ticket.')
+    if (version !== identityVersion.current) throw new Error('The account changed. Please reopen the ticket.')
     const ticket = applyComplaint(saved)
     addToast(`Internal status updated to ${ticket.status}`, 'success')
     await refreshComplaints()
@@ -235,11 +255,11 @@ export function AppProvider({ children }) {
   }
 
   const saveOfficialReference = async (id, officialRef) => {
-    const version = accountVersion.current
+    const version = identityVersion.current
     const saved = await apiRequest(`/complaints/${id}/official-ref`, session?.access_token, {
       method: 'PATCH', body: JSON.stringify({ official_ref: officialRef }),
     })
-    if (version !== accountVersion.current) throw new Error('The account changed. Please reopen the ticket.')
+    if (version !== identityVersion.current) throw new Error('The account changed. Please reopen the ticket.')
     applyComplaint(saved)
     addToast('Saved your unverified filing reference.', 'success')
     await refreshComplaints()
@@ -272,6 +292,7 @@ export function AppProvider({ children }) {
     setIsAiTyping(true)
     setSchemeChatError('')
     const now = Date.now()
+    const version = schemeChatVersion.current
     setChatMessages(prev => [...prev, { id: `u-${now}`, sender: 'user', text: userText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     try {
@@ -280,12 +301,17 @@ export function AppProvider({ children }) {
         method: 'POST', body: JSON.stringify({ message: userText, profile,
           ...(category && category !== 'All' ? { category } : {}) }),
       }))
+      if (version !== schemeChatVersion.current) return false
       setChatMessages(prev => [...prev, { id: `a-${now}`, sender: 'assistant', text: reply.answer,
         citations: reply.citations, mode: reply.mode, tool_trace: reply.tool_trace,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
       return true
-    } catch (error) { setSchemeChatError(error.message); return false }
-    finally { schemeChatBusy.current = false; setIsAiTyping(false) }
+    } catch (error) {
+      if (version === schemeChatVersion.current) setSchemeChatError(error.message)
+      return false
+    } finally {
+      if (version === schemeChatVersion.current) { schemeChatBusy.current = false; setIsAiTyping(false) }
+    }
   }
 
   // Selecting a persona opens sign-in. Only /api/me establishes its role.
