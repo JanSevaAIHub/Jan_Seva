@@ -46,7 +46,7 @@ Commands run from repository root unless `apps/web` is specified. `python` below
 | `python -m app.scripts.migrate_schemes` | `Scheme migration not applied: DATABASE_URL is not configured.`, exit 1 |
 | `python -m app.scripts.ingest_schemes --validate-only` | `{"validated_records": 8, "failed_records": 0, "chunks": 8}`, exit 0 |
 | `python -m app.scripts.evaluate_schemes` | Five JSON results with `execution: blocked`, `error: DATABASE_URL is not configured.`, exit 1 |
-| `git status`, `git diff`, `git diff --check` | Reviewed intended changes only; final whitespace check required before commit |
+| `git status`, `git diff`, `git diff --check` | Reviewed intended changes only; staged whitespace check passed |
 | `git ls-remote origin HEAD refs/heads/master refs/heads/release/phase-5-mvp-review` | Remote HEAD/master at `a382a665c9b9ba34d5deb7c48e37ff6a6521550c` at review |
 | `git push --dry-run origin HEAD:refs/heads/release/phase-5-mvp-review` | New branch dry run accepted, exit 0; no force or merge |
 
@@ -68,7 +68,7 @@ Complaint browser journeys use the real isolated backend, not intercepted succes
 
 | Check | Finding |
 |---|---|
-| Committed secrets | Heuristic scan of all reachable Git objects: **186 blobs, 184 text blobs, 0 findings** before the release commit. Patterns cover private keys, common provider tokens, literal JWTs and credentialed PostgreSQL URLs. This is not exhaustive secret detection. |
+| Committed secrets | Heuristic scan of all reachable Git objects: **186 blobs, 184 text blobs, 0 findings** before the release commit. Patterns cover private keys, common provider tokens, literal JWTs and credentialed PostgreSQL URLs. The subsequent scan of all nine staged release files also returned 0 findings; current release-document local links had 0 missing targets. This is not exhaustive secret detection. |
 | Hardcoded demo passwords | Tracked source/config scan found **0 quoted-literal candidates**. Passwords are entered at runtime/operator configuration; test password is generated. Only example env files are tracked. |
 | Invalid/expired JWT | Rejected in backend tests; trusted JWKS, allowed algorithms, issuer, audience and required claims validated |
 | Citizen officer action | Backend rejects wrong role even if client state is changed |
@@ -113,4 +113,4 @@ No application source, database migration, dependency or CSS was changed in Phas
 
 ## Git and review
 
-A separate `release/phase-5-mvp-review` branch preserves the existing implementation commits. Changes are reviewed and committed with a scoped release-test/documentation message; no force push or automatic merge is authorized. The connected GitHub identity reports read-only repository access, while local Git's authenticated push dry run succeeds. Publishing/PR outcome is recorded in the final handoff; a draft is appropriate because live gates remain open.
+A separate `release/phase-5-mvp-review` branch preserves the existing implementation commits. Release tests/documentation were committed as `dda0947` (`test: verify MVP release and document remaining live gates`) and pushed normally with tracking enabled. The connected GitHub integration rejected PR creation with HTTP 403 (`Resource not accessible by integration`). Local Git credentials successfully created [draft PR #1](https://github.com/JanSevaAIHub/Jan_Seva/pull/1) through the GitHub REST API. It is open and explicitly draft because live gates remain unresolved. No force push, default-branch update or merge was performed. This outcome-only documentation update is committed separately; the final working-tree status is checked before handoff.
