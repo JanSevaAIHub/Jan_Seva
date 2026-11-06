@@ -8,7 +8,7 @@ Phase 2 registered routes: `GET /health`, `GET /me`, `POST /complaints`, `GET /c
 
 The owner-only reference route accepts `{official_ref}` and returns `ComplaintDetail` with the unverified user-reported reference. `official_status` is `NOT_FILED` until the citizen supplies a reference, then `USER_REPORTED_FILED`. Internal status never implies government filing/resolution. See [Phase 2 setup](phase-2-setup.md) for assignment configuration, tests and live verification limits.
 
-## Routes
+## Implemented routes
 
 | Method | Route | Request | Response |
 |---|---|---|---|
@@ -16,14 +16,11 @@ The owner-only reference route accepts `{official_ref}` and returns `ComplaintDe
 | GET | `/me` | authenticated | `Profile` |
 | GET | `/schemes?query=&state=&category=&limit=` | optional filters | database `SchemeCard[]`; vector query when provided |
 | POST | `/schemes/ask` | `{ "message": string, "profile"?: {state?, occupation?}, "state"?: string, "category"?: string }` | `{ "answer": string, "citations": SchemeCitation[], "tool_trace": ToolTrace[], "mode": string }` |
-| POST | `/schemes/eligibility` | `{ "scheme_id": string, "profile": ProfileInput }` | `{ "status": EligibilityStatus, "reasons": string[], "missing": string[], "citations": Citation[] }` |
-| POST | `/complaints/analyze` | `{ "title": string, "description": string, "locality": string }` | `{ "category": ComplaintCategory, "department": string, "duplicates": DuplicateSuggestion[], "draft": string }` |
 | POST | `/complaints` | confirmed `ComplaintCreate` | 201 `ComplaintDetail` with `LOCAL_SUBMITTED` internal status |
 | GET | `/complaints?status=` | authenticated + ownership/assignment scope | `ComplaintDetail[]` |
 | GET | `/complaints/{id}` | authenticated + owner/officer check | `ComplaintDetail` including internal events |
 | PATCH | `/officer/complaints/{id}` | assigned officer only: `{ "status": InternalStatus, "note"?: string }` | updated `ComplaintDetail`; append audit event |
 | PATCH | `/complaints/{id}/official-ref` | citizen owner: `{ "official_ref": string }` | `ComplaintDetail`; internal status unchanged |
-| POST | `/agent/message` | `{ "message": string, "session_id"?: string }` | `{ "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "citations": Citation[], "actions": ToolTrace[] }` |
 
 ## Phase 3 implemented scheme boundary
 
@@ -32,6 +29,10 @@ The owner-only reference route accepts `{official_ref}` and returns `ComplaintDe
 - Citations contain `{scheme_id, chunk_id, title, url, excerpt, reviewed_at, evidence_kind}` from retrieved source records. Evidence is a reviewed paraphrase, not a verbatim source quote. Unsupported model text/URLs and partial-paragraph selections are removed before display.
 - Missing/failed embedding configuration/service returns sanitized retryable 503. Empty/insufficient evidence returns uncertainty with no citations. LLM failure is explicitly labeled if related extracts are returned. No mock/keyword chatbot fallback or eligibility guarantee exists.
 - See [Phase 3 setup](phase-3-setup.md) for additive migration 002, ingestion, source review, tests and live blockers. `SchemeCard` includes the stored fields plus curated eligibility, document records and evidence/limitations for the retained UI; no invented match score is returned.
+
+## Deferred routes (not registered)
+
+`POST /schemes/eligibility`, `POST /complaints/analyze` and `POST /agent/message` are design proposals only. They are unavailable; no consumer should treat them as implemented endpoints. Eligibility/duplicate/agent types below describe deferred design, not working features.
 
 ## Shared types
 

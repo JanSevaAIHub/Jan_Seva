@@ -1,11 +1,11 @@
-# Implementation status - Phase 5
+# Implementation status - full-project bug audit
 
 Reviewed 2026-11-07. VERIFIED describes the stated local check, not live-provider readiness. PARTIAL means implemented with an unresolved gate. BLOCKED means external execution could not run. The original assessment is preserved in [Phase 0 audit](phase-0-audit.md).
 
 | Capability | Status | Evidence / remaining gate |
 |---|---|---|
 | Frontend production compilation | VERIFIED | Default and public-placeholder Auth-configured builds pass |
-| API/session/error handling | VERIFIED | 8 client tests plus browser failure/race scenarios |
+| API/session/error handling | VERIFIED | 9 client tests plus browser failure/race scenarios |
 | JWT, roles and complaint isolation | VERIFIED | Signed JWT and backend authorization tests; no local role bypass |
 | Complaint creation/read/status/audit | VERIFIED | Real isolated backend; persistence, atomicity, browser reload |
 | Independent citizen/officer sessions | VERIFIED | Separate Chromium storage contexts share authorized ticket history |
@@ -20,8 +20,10 @@ Reviewed 2026-11-07. VERIFIED describes the stated local check, not live-provide
 | Public deployment readiness | PARTIAL | No live gates, rate limits/quotas or deployment verification |
 | Documentation/interview preparation | VERIFIED | README, measured review and 12 interview topics |
 
-Final measurements: **103 pytest passed, 1 skipped, 1 warning; 8 client passed; 12 browser passed.** No failed local P0 tests remain. The live test must be explicitly enabled with real credentials. See [release review](release-review.md) for commands, outputs, changed files and manual configuration.
+Final measurements: **109 pytest passed, 1 skipped, 1 warning; 9 client passed; 18 browser passed.** No failed local P0 tests remain. The live test must be explicitly enabled with real credentials. See the [current bug audit](bug-audit.md) for commands, reproduced failures, fixes, changed files and manual configuration. The [Phase 5 review](release-review.md) remains historical evidence.
 
 Not implemented: government integrations, complaint AI/semantic deduplication, general homepage assistant, personalized eligibility engine, verified uploads/GPS, notifications/translation backend, persistent bookmarks, complaint edit/delete, rate limits or automated deployment. Deferred visual components remain labeled previews/unavailable. Internal resolution is not official resolution.
 
-Phase 5 adds tests and documentation only. Recommend controlled portfolio review with disclosed limits; do not claim a fully verified live AI MVP or public production readiness.
+The later full-project audit repairs the complaint category width and readiness check, successful-write acknowledgment during token refresh, cross-account scheme chat, stale complaint snapshots, officer-note classification, modal keyboard focus and malformed provider handling. Seven runtime/schema bugs have regression coverage. Architecture/API documentation is corrected. No UI redesign, dependency, authorization bypass or production simulation was introduced.
+
+Run `app.scripts.migrate` on an existing PostgreSQL installation to apply additive repair 003 before the vector migration/checks. Actual database execution of this repair is BLOCKED locally; SQL/reflection/runner tests are passing and are not represented as a live migration. Recommend an isolated local test/demo with disclosed limits; the actual-account demonstration remains BLOCKED, and public production readiness is not claimed.

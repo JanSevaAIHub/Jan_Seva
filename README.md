@@ -2,7 +2,7 @@
 
 An independent citizen-assistance portfolio project: discover public schemes with cited evidence, create internal civic complaints, and review their history with an assigned officer. JanSeva does not file government grievances or verify government resolution.
 
-**Release status (2026-11-07): local verification passes; live-provider verification is blocked by missing configuration.** This is a controlled demo candidate, not an approved public production release. See the [release review](docs/release-review.md) and [implementation status](docs/implementation-status.md).
+**Release status (2026-11-07): local verification passes; live-provider verification is blocked by missing configuration.** This is a controlled demo candidate, not an approved public production release. See the [current bug audit](docs/bug-audit.md), [Phase 5 release review](docs/release-review.md) and [implementation status](docs/implementation-status.md).
 
 ## Technology and architecture
 
@@ -76,7 +76,7 @@ $env:PYTHONPATH = 'services/api'
 .\.venv\Scripts\python.exe -m app.scripts.evaluate_schemes
 ```
 
-Migration 001 creates tables, constraints and access policies; migration 002 enables pgvector and vector metadata. Operators need the corresponding database privileges. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts ten explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
+The core migration command applies 001 (tables, constraints, access policies) and additive repair 003 (widens complaint categories to fit streetlight) in one transaction. Run it again on existing installations before the separate 002 vector migration. Repair 003 never narrows a wider column. Migration 002 enables pgvector and vector metadata. Operators need the corresponding database privileges. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts ten explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
 
 Only the configured demo citizen's **new** complaints are assigned to the configured officer. Both profiles must exist and the assignee must be an officer. Absent assignment leaves tickets unassigned; partial/invalid configuration fails closed. This grants no other user's access and does not reassign historical tickets.
 
@@ -131,7 +131,7 @@ npm.cmd --prefix apps/web run test:e2e
 npm.cmd --prefix apps/web run build
 ```
 
-Final results: **103 backend passed, 1 live test skipped; 8 client passed; 12 Chromium browser passed; builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. Actual release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
+Final results: **109 backend passed, 1 live test skipped; 9 client passed; 18 Chromium browser passed; builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. Actual release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
 
 After setup, sign in as Arjun, load schemes, ask a question and open its official citation. Submit a complaint, retain the returned UUID, check My Requests and refresh. In a separate browser profile, sign in as R. Singh, open the assigned UUID and advance its status with a note. Refresh Arjun's tracking page and confirm persistent status/history. Then run the live gate:
 
