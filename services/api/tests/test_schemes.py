@@ -83,6 +83,14 @@ def test_embedding_http_payload_dimensions_order_and_errors(monkeypatch):
         get_settings.cache_clear()
 
 
+@pytest.mark.parametrize("output", [[None], ["malformed"], [{"type": "message", "content": [None]}]])
+def test_malformed_generation_items_become_sanitized_provider_errors(monkeypatch, output):
+    monkeypatch.setenv("LLM_MODEL", "isolated-provider-model")
+    monkeypatch.setattr(provider, "provider_post", lambda *_: {"status": "completed", "output": output})
+    with pytest.raises(ProviderError, match="completed evidence selection"):
+        provider.select_evidence("Synthetic test question", [], None)
+
+
 def test_list_returns_stored_records_and_filters_without_model_calls(client, db_session, corpus, monkeypatch):
     for record in corpus.values():
         db_session.add(Scheme(id=record.id, title=record.title, category=record.category, state=record.state,

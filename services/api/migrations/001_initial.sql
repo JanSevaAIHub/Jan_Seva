@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.complaints (
     user_id UUID NOT NULL REFERENCES public.profiles(user_id) ON DELETE RESTRICT,
     title VARCHAR(250) NOT NULL,
     description TEXT NOT NULL,
-    category VARCHAR(10) NOT NULL,
+    category VARCHAR(11) NOT NULL,
     locality VARCHAR(250) NOT NULL,
     status VARCHAR(15) NOT NULL DEFAULT 'LOCAL_SUBMITTED',
     assigned_officer_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL,

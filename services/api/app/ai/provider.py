@@ -109,5 +109,5 @@ def select_evidence(message: str, passages: list[dict], profile: dict | None) ->
         if not isinstance(parsed, dict):
             raise ValueError
         return parsed
-    except (KeyError, TypeError, ValueError):
+    except (AttributeError, KeyError, TypeError, ValueError):
         raise ProviderError("Generation did not return a completed evidence selection.") from None
