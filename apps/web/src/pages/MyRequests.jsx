@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ClipboardList,
@@ -14,9 +14,11 @@ import {
   Calendar
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 export function MyRequests() {
-  const { complaints, setActiveComplaint, setPackageModalComplaint } = useApp()
+  const { complaints, refreshComplaints, setPackageModalComplaint } = useApp()
+  useEffect(() => { refreshComplaints() }, [])
   const [statusFilter, setStatusFilter] = useState('ALL')
 
   const filteredComplaints = complaints.filter(c => {
@@ -26,6 +28,7 @@ export function MyRequests() {
 
   return (
     <div className="space-y-5">
+      <ComplaintFeedback />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -110,7 +113,8 @@ export function MyRequests() {
             {/* Details */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               <div className="md:col-span-7 space-y-2">
-                <h3 className="text-base font-bold text-slate-900">{item.title}</h3>
+                <Link to={`/track?id=${item.id}`} className="text-base font-bold text-slate-900 hover:text-violet-700">{item.title}</Link>
+                <Link to={`/track?id=${item.id}`} className="block text-xs font-bold text-violet-700">View details &amp; audit history</Link>
                 <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <MapPin size={13} className="text-slate-400 flex-none" />

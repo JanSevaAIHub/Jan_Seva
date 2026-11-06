@@ -1,0 +1,5 @@
+{"case": "farmer", "question": "What schemes could support farmers in Punjab?", "execution": "blocked", "error": "DATABASE_URL is not configured."}
+{"case": "student", "question": "Are there verified government schemes for students?", "execution": "blocked", "error": "DATABASE_URL is not configured."}
+{"case": "documents", "question": "What documents are required for Sukanya Samriddhi Yojana?", "execution": "blocked", "error": "DATABASE_URL is not configured."}
+{"case": "state", "question": "Can a person from Haryana without Punjab domicile apply for Punjab Ashirwad?", "execution": "blocked", "error": "DATABASE_URL is not configured."}
+{"case": "unknown", "question": "Tell me about the Galactic Farming Grant, a scheme not in the database.", "execution": "blocked", "error": "DATABASE_URL is not configured."}

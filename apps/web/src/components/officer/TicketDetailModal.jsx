@@ -1,18 +1,30 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, UserCheck } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { NEXT_STATUS } from '../../lib/complaints'
 
 export function TicketDetailModal() {
   const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus } = useApp()
   const [selectedStatus, setSelectedStatus] = useState('')
   const [note, setNote] = useState('')
 
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    setSelectedStatus(NEXT_STATUS[officerTicketModal?.status] || '')
+    setNote('')
+    setError('')
+  }, [officerTicketModal?.id, officerTicketModal?.status])
   if (!officerTicketModal) return null
 
-  const handleUpdate = () => {
-    if (!selectedStatus) return
-    updateComplaintStatus(officerTicketModal.id, selectedStatus, note)
-    setOfficerTicketModal(null)
+  const handleUpdate = async () => {
+    if (!selectedStatus || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await updateComplaintStatus(officerTicketModal.id, selectedStatus, note)
+    } catch (error) { setError(error.message) }
+    finally { setSaving(false) }
   }
 
   return (
@@ -43,6 +55,7 @@ export function TicketDetailModal() {
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
           <div>
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ticket Title</div>
             <h3 className="text-sm font-semibold text-slate-900 mt-1">{officerTicketModal.title}</h3>
@@ -81,21 +94,20 @@ export function TicketDetailModal() {
             <label className="text-xs font-bold text-slate-700 block">Update Ticket Status</label>
             <select
               value={selectedStatus}
+              disabled={saving || !NEXT_STATUS[officerTicketModal.status]}
               onChange={e => setSelectedStatus(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-violet-500 bg-white"
             >
               <option value="">Select new status...</option>
-              <option value="UNDER_REVIEW">UNDER_REVIEW (Triage &amp; Duplicate Check)</option>
-              <option value="IN_PROGRESS">IN_PROGRESS (Technician Dispatched)</option>
-              <option value="RESOLVED">RESOLVED (Issue Fixed on Field)</option>
-              <option value="REJECTED">REJECTED (Invalid / Out of Jurisdiction)</option>
+              {NEXT_STATUS[officerTicketModal.status] && <option value={NEXT_STATUS[officerTicketModal.status]}>{NEXT_STATUS[officerTicketModal.status]} (Internal status)</option>}
             </select>
 
             <textarea
               rows={2}
               value={note}
+              maxLength={2000}
               onChange={e => setNote(e.target.value)}
-              placeholder="Add audit note / field dispatch instruction..."
+              placeholder="Optional internal status note..."
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-violet-500 bg-white resize-none"
             />
           </div>
@@ -111,10 +123,10 @@ export function TicketDetailModal() {
           </button>
           <button
             onClick={handleUpdate}
-            disabled={!selectedStatus}
+            disabled={!selectedStatus || saving}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-violet-600/20 transition-all"
           >
-            Apply Status Update <ArrowRight size={14} />
+            {saving ? 'Saving?' : 'Apply Status Update'} <ArrowRight size={14} />
           </button>
         </div>
       </div>

@@ -2,29 +2,43 @@
 
 Base path: `/api`. JSON requests and responses. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
 
+Phase 2 registered routes: `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Phase 3 also registers public `GET /schemes` and `POST /schemes/ask`; scheme eligibility, complaint AI and agent routes remain unimplemented. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
+
+`ComplaintCreate` accepts only `{title, description, category, locality}`. A citizen's verified identity supplies ownership; the create response is 201 with `ComplaintDetail`. List returns `ComplaintDetail[]` including events for the existing list timelines, scoped to citizen ownership or officer assignment; `?status=` optionally filters. Officer PATCH accepts `{status, note?}` and advances exactly one step: `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Invalid transitions return 409. Update and audit event commit atomically. Notes may be omitted, in which case the server records a default note.
+
+The owner-only reference route accepts `{official_ref}` and returns `ComplaintDetail` with the unverified user-reported reference. `official_status` is `NOT_FILED` until the citizen supplies a reference, then `USER_REPORTED_FILED`. Internal status never implies government filing/resolution. See [Phase 2 setup](phase-2-setup.md) for assignment configuration, tests and live verification limits.
+
 ## Routes
 
 | Method | Route | Request | Response |
 |---|---|---|---|
 | GET | `/health` | none | `{ "status": "ok" }` |
 | GET | `/me` | authenticated | `Profile` |
-| GET | `/schemes?query=&state=&category=&limit=` | optional filters | `SchemeCard[]` |
-| POST | `/schemes/ask` | `{ "message": string, "profile"?: ProfileInput }` | `{ "answer": string, "citations": Citation[], "tool_trace": ToolTrace[] }` |
+| GET | `/schemes?query=&state=&category=&limit=` | optional filters | database `SchemeCard[]`; vector query when provided |
+| POST | `/schemes/ask` | `{ "message": string, "profile"?: {state?, occupation?}, "state"?: string, "category"?: string }` | `{ "answer": string, "citations": SchemeCitation[], "tool_trace": ToolTrace[], "mode": string }` |
 | POST | `/schemes/eligibility` | `{ "scheme_id": string, "profile": ProfileInput }` | `{ "status": EligibilityStatus, "reasons": string[], "missing": string[], "citations": Citation[] }` |
 | POST | `/complaints/analyze` | `{ "title": string, "description": string, "locality": string }` | `{ "category": ComplaintCategory, "department": string, "duplicates": DuplicateSuggestion[], "draft": string }` |
-| POST | `/complaints` | confirmed complaint draft | `ComplaintSummary` with `LOCAL_SUBMITTED` internal status |
-| GET | `/complaints` | authenticated; officer may filter | `ComplaintSummary[]` |
+| POST | `/complaints` | confirmed `ComplaintCreate` | 201 `ComplaintDetail` with `LOCAL_SUBMITTED` internal status |
+| GET | `/complaints?status=` | authenticated + ownership/assignment scope | `ComplaintDetail[]` |
 | GET | `/complaints/{id}` | authenticated + owner/officer check | `ComplaintDetail` including internal events |
-| PATCH | `/officer/complaints/{id}` | officer only: `{ "status": InternalStatus, "note": string }` | updated `ComplaintDetail`; append audit event |
-| PATCH | `/complaints/{id}/official-ref` | owner: user-provided `{ "reference": string, "channel": string, "submitted_at"?: string }` | updated official-filing metadata only |
+| PATCH | `/officer/complaints/{id}` | assigned officer only: `{ "status": InternalStatus, "note"?: string }` | updated `ComplaintDetail`; append audit event |
+| PATCH | `/complaints/{id}/official-ref` | citizen owner: `{ "official_ref": string }` | `ComplaintDetail`; internal status unchanged |
 | POST | `/agent/message` | `{ "message": string, "session_id"?: string }` | `{ "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "citations": Citation[], "actions": ToolTrace[] }` |
+
+## Phase 3 implemented scheme boundary
+
+- `GET /schemes?query=&state=&category=&limit=` returns actual stored `SchemeCard[]`. Without `query`, listing needs only the database. With a query, exact pgvector cosine retrieval uses the configured OpenAI embedding model. A selected state includes national schemes; category is an exact case-insensitive filter. Limit is 1?50 for listing and query retrieval considers at most ten passages before scheme deduplication.
+- `POST /schemes/ask` accepts `{message, profile?: {state?, occupation?}, state?, category?}`. It returns `{answer, citations, tool_trace, mode}`. `mode` is `grounded_extracts`, `extractive_fallback` or `insufficient_evidence`.
+- Citations contain `{scheme_id, chunk_id, title, url, excerpt, reviewed_at, evidence_kind}` from retrieved source records. Evidence is a reviewed paraphrase, not a verbatim source quote. Unsupported model text/URLs and partial-paragraph selections are removed before display.
+- Missing/failed embedding configuration/service returns sanitized retryable 503. Empty/insufficient evidence returns uncertainty with no citations. LLM failure is explicitly labeled if related extracts are returned. No mock/keyword chatbot fallback or eligibility guarantee exists.
+- See [Phase 3 setup](phase-3-setup.md) for additive migration 002, ingestion, source review, tests and live blockers. `SchemeCard` includes the stored fields plus curated eligibility, document records and evidence/limitations for the retained UI; no invented match score is returned.
 
 ## Shared types
 
 - `EligibilityStatus`: `POTENTIAL | NOT_MATCHED | NEEDS_INFO`.
 - `ComplaintCategory`: `road | water | sanitation | streetlight | other`.
-- `InternalStatus`: `DRAFT | LOCAL_SUBMITTED | UNDER_REVIEW | IN_PROGRESS | RESOLVED | CANCELLED | REJECTED | REOPENED` (REOPENED is demo-only).
-- `OfficialFilingStatus`: `NOT_FILED | USER_REPORTED_FILED | ACKNOWLEDGED`. Never derive this from an internal status or portal link click.
+- Phase 2 writable `InternalStatus`: `LOCAL_SUBMITTED | UNDER_REVIEW | IN_PROGRESS | RESOLVED`. Storage retains older Phase 1 enum values for existing data; the new workflow cannot transition into them.
+- `OfficialFilingStatus`: `NOT_FILED | USER_REPORTED_FILED`. Never derive this from an internal status or portal link click.
 - `ProfileInput`: optional `state`, `occupation`, `age_range`, and income band only as needed; no Aadhaar or identity documents.
 - `Citation`: `{ "title": string, "url": string, "excerpt"?: string, "reviewed_at"?: string }`. A scheme claim must have a verified official URL.
 - `ToolTrace`: `{ "tool": string, "status": "ok"|"skipped"|"error" }`; no raw prompts, credentials, or PII.

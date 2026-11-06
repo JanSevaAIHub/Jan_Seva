@@ -1,0 +1,14 @@
+Scheme: Sukanya Samriddhi Yojana (SSY)
+State: National
+Category: Savings
+Source URL: https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44
+Reviewed: 2026-11-07
+Evidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.
+
+Government small-savings account for the future education and other permitted needs of a girl child.
+
+Eligibility: A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.
+
+Verified documents / enrolment records: Sukanya Samriddhi account opening form; Girl child birth certificate; Aadhaar number; PAN or Form 60
+
+Evidence and limitations: The January 2026 PIB note identifies these four account-opening records. Deposits are required and scheme rules govern withdrawals and maturity. Interest rates are notified periodically; no current interest rate is asserted in this dataset. The rules for twin/triplet exceptions require supporting records.
