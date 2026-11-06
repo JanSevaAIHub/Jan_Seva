@@ -26,7 +26,8 @@ os.environ["CORS_ORIGINS"] = "http://127.0.0.1:5174"
 
 from app.db import Base, get_db
 from app.main import app
-from app.models import CORE_TABLES, Profile, Role
+from app.models import CORE_TABLES, Profile, Role, Scheme
+from app.ai.corpus import read_corpus
 
 # The fake Auth endpoints also receive Supabase SDK headers (apikey, client info).
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5174"],
@@ -56,6 +57,13 @@ async def lifespan(_app):
         Base.metadata.create_all(engine, tables=CORE_TABLES)
         with Session(engine) as db:
             db.add_all([Profile(user_id=UUID(user["id"]), name=user["name"], role=user["role"]) for user in identities.values()])
+            # Real reviewed records in the isolated DB exercise the real listing
+            # route. No fake embeddings or vector-retrieval override are installed.
+            records, failures = read_corpus()
+            assert not failures
+            db.add_all([Scheme(id=r.id, title=r.title, category=r.category, state=r.state,
+                description=r.description, source_url=r.source_url, rules_json=r.rules(),
+                reviewed_at=r.reviewed_at) for r in records])
             db.commit()
 
         def database():

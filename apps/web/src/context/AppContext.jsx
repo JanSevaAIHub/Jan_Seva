@@ -1,10 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import {
-  NOTIFICATIONS_DATA,
-} from '../data/mockData'
-import { supabase } from '../lib/supabase'
-import { apiRequest, publicApiRequest } from '../lib/api'
-import { schemeView } from '../lib/schemes'
+import { supabase, authConfigurationError } from '../lib/supabase'
+import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
+import { schemeView, schemeAnswer } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
 
 const AppContext = createContext(null)
@@ -45,9 +42,10 @@ export function AppProvider({ children }) {
   const [routingItems] = useState([])
 
   // Notifications state
-  const [notifications, setNotifications] = useState(NOTIFICATIONS_DATA)
+  const [notifications, setNotifications] = useState([])
   
   // Toast notifications
+  const toastIds = useRef(0)
   const [toasts, setToasts] = useState([])
 
   // AI Chat Assistant state (for Scheme Discovery)
@@ -61,7 +59,7 @@ export function AppProvider({ children }) {
 
   // Add toast notification
   const addToast = (message, type = 'success') => {
-    const id = Date.now() + Math.random()
+    const id = ++toastIds.current
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
@@ -72,19 +70,42 @@ export function AppProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
-  // Toggle bookmark scheme
-  const toggleSaveScheme = (schemeId) => {
-    setSavedSchemeIds(prev => {
-      const exists = prev.includes(schemeId)
-      if (exists) {
-        addToast('Removed scheme from saved list', 'info')
-        return prev.filter(id => id !== schemeId)
-      } else {
-        addToast('Scheme saved for this browsing session.', 'success')
-        return [...prev, schemeId]
-      }
-    })
+  // Bookmarks are session-local; state updater functions stay free of side effects.
+  const toggleSaveScheme = schemeId => {
+    const exists = savedSchemeIds.includes(schemeId)
+    setSavedSchemeIds(prev => exists ? prev.filter(id => id !== schemeId) : [...prev, schemeId])
+    addToast(exists ? 'Removed scheme from saved list.' : 'Scheme saved for this browsing session.', 'info')
   }
+
+  const clearAccount = useCallback(() => {
+    accountVersion.current += 1
+    sessionUser.current = null
+    sessionToken.current = null
+    setSession(null)
+    setCurrentUser(GUEST)
+    setComplaints([])
+    setActiveComplaint(null)
+    setOfficerTicketModal(null)
+    setPackageModalComplaint(null)
+    setSavedSchemeIds([])
+    setNotifications([])
+    setToasts([])
+    setAuthLoading(false)
+    setComplaintsLoading(false)
+  }, [])
+
+  useEffect(() => onUnauthorized(failedToken => {
+    if (failedToken !== sessionToken.current) return
+    clearAccount()
+    setAuthError('Your session expired. Please sign in again. Unsaved form values are kept.')
+    setComplaintsError('')
+    setAuthBusy(true)
+    // SDK local sign-out also removes persisted tokens; do not replay failed writes.
+    Promise.resolve(supabase?.auth.signOut({ scope: 'local' }))
+      .then(result => { if (result?.error) throw result.error })
+      .catch(() => { setAuthError('Your session expired. Sign in again; the previous session could not be cleared from the provider.') })
+      .finally(() => setAuthBusy(false))
+  }), [clearAccount])
 
   // The auth subscription only updates React state; API calls run outside its lock.
   useEffect(() => {
@@ -102,6 +123,9 @@ export function AppProvider({ children }) {
         setOfficerTicketModal(null)
         setPackageModalComplaint(null)
         setComplaintSaveError('')
+        setSavedSchemeIds([])
+        setNotifications([])
+        setToasts([])
       }
       setSession(nextSession)
       setAuthLoading(Boolean(nextSession))
@@ -128,13 +152,17 @@ export function AppProvider({ children }) {
     setComplaintsLoading(true)
     setComplaintsError('')
     try {
-      const [profile, records] = await Promise.all([
-        apiRequest('/me', session.access_token),
-        apiRequest('/complaints', session.access_token),
-      ])
+      const profile = await apiRequest('/me', session.access_token)
       if (!isCurrent()) return
+      if (!profile || typeof profile.name !== 'string' || typeof profile.user_id !== 'string' ||
+        (profile.occupation != null && typeof profile.occupation !== 'string') ||
+        !['citizen', 'officer'].includes(profile.role)) throw new Error('The API returned an invalid profile. Please retry.')
       setCurrentUser({ ...profile, avatar: profile.name.split(' ').map(n => n[0]).join(''), completeness: 0 })
       setAuthError('')
+      // A queue failure must not discard a successfully verified account role.
+      const records = await apiRequest('/complaints', session.access_token)
+      if (!isCurrent()) return
+      if (!Array.isArray(records)) throw new Error('The API returned an invalid complaint list. Please retry.')
       const tickets = records.map(complaintView)
       setComplaints(tickets)
       setActiveComplaint(prev => tickets.find(t => t.id === prev?.id) || tickets[0] || null)
@@ -166,12 +194,12 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('focus', onFocus)
   }, [refreshComplaints])
 
-  const loadComplaint = async id => {
+  const loadComplaint = useCallback(async id => {
     const version = accountVersion.current
     const saved = await apiRequest(`/complaints/${encodeURIComponent(id)}`, session?.access_token)
     if (version !== accountVersion.current) throw new Error('The account changed. Please try again.')
     return applyComplaint(saved)
-  }
+  }, [session])
 
   const addComplaint = async draft => {
     if (complaintSaving) return null
@@ -187,7 +215,7 @@ export function AppProvider({ children }) {
       setActiveComplaint(ticket)
       addToast(`Internal ticket saved: ${ticket.id}`, 'success')
       await refreshComplaints()
-      return ticket
+      return version === accountVersion.current ? ticket : null
     } catch (error) {
       if (version === accountVersion.current) setComplaintSaveError(error.message)
       return null
@@ -229,6 +257,7 @@ export function AppProvider({ children }) {
       if (state && state !== 'All') params.set('state', state)
       if (category && category !== 'All') params.set('category', category)
       const records = await publicApiRequest(`/schemes?${params}`)
+      if (!Array.isArray(records)) throw new Error('The scheme service returned an invalid list. Please retry.')
       if (request === schemeRequest.current) setSchemes(records.map(schemeView))
     } catch (error) {
       if (request === schemeRequest.current) { setSchemes([]); setSchemesError(error.message) }
@@ -247,10 +276,10 @@ export function AppProvider({ children }) {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     try {
       const profile = { ...(selectedState !== 'All' ? { state: selectedState } : {}), ...(currentUser.occupation ? { occupation: currentUser.occupation } : {}) }
-      const reply = await publicApiRequest('/schemes/ask', {
+      const reply = schemeAnswer(await publicApiRequest('/schemes/ask', {
         method: 'POST', body: JSON.stringify({ message: userText, profile,
           ...(category && category !== 'All' ? { category } : {}) }),
-      })
+      }))
       setChatMessages(prev => [...prev, { id: `a-${now}`, sender: 'assistant', text: reply.answer,
         citations: reply.citations, mode: reply.mode, tool_trace: reply.tool_trace,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
@@ -265,7 +294,7 @@ export function AppProvider({ children }) {
     setAuthBusy(true)
     setAuthError('')
     try {
-      if (!supabase) throw new Error('Sign-in is not configured. Set the public Supabase URL and key.')
+      if (!supabase) throw new Error(authConfigurationError)
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       return true
@@ -273,9 +302,16 @@ export function AppProvider({ children }) {
     finally { setAuthBusy(false) }
   }
   const signOut = async () => {
-    if (!supabase) return
-    const { error } = await supabase.auth.signOut({ scope: 'local' })
-    if (error) addToast(error.message, 'warning')
+    if (!supabase || authBusy) return
+    setAuthBusy(true)
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) throw error
+      clearAccount()
+      setAuthError('')
+      setComplaintsError('')
+    } catch { setAuthError('Sign-out failed. Check your connection and try again.'); addToast('Sign-out failed. Please retry.', 'warning') }
+    finally { setAuthBusy(false) }
   }
 
   // Mark all notifications as read

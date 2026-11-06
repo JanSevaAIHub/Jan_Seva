@@ -21,7 +21,7 @@ export function ComplaintPackageModal() {
 INTERNAL TRACKING ID: ${packageModalComplaint.id}
 DATE GENERATED: ${new Date().toLocaleDateString()}
 CATEGORY: ${packageModalComplaint.category}
-TARGET DEPARTMENT: ${packageModalComplaint.department || 'Urban Infrastructure Dept'}
+OFFICER ASSIGNMENT: ${packageModalComplaint.department || 'Not recorded'}
 LOCATION: ${packageModalComplaint.locality}
 
 SUBJECT:
@@ -143,7 +143,7 @@ OFFICIAL FILING CHANNELS:
                 disabled={currentUser.role !== 'citizen' || saving}
                 onChange={e => setOfficialRefInput(e.target.value)}
                 placeholder="e.g. CPGRAMS-2026-98124"
-                className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-violet-500 bg-white"
+                className="min-w-0 flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-violet-500 bg-white"
               />
               <button
                 onClick={handleSaveOfficialRef}

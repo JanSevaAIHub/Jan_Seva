@@ -10,11 +10,13 @@ export function Topbar() {
     switchUserRole,
     session,
     signOut,
+    authBusy,
     notifications,
     markNotificationsRead
   } = useApp()
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [portraitFailed, setPortraitFailed] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showLangMenu, setShowLangMenu] = useState(false)
   const [selectedLang, setSelectedLang] = useState('English')
@@ -39,10 +41,12 @@ export function Topbar() {
           </button>
 
           {showLangMenu && (
-            <div className="absolute right-0 mt-1.5 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-fade-in">
+            <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-fade-in">
               {['English', 'हिंदी', 'ਪੰਜਾਬੀ'].map(lang => (
                 <button
                   key={lang}
+                  disabled={lang !== 'English'}
+                  title={lang === 'English' ? 'Current interface language' : 'Translation is not available'}
                   onClick={() => {
                     setSelectedLang(lang)
                     setShowLangMenu(false)
@@ -74,14 +78,15 @@ export function Topbar() {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-fade-in">
+            <div className="fixed left-3 right-3 top-[62px] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-fade-in">
               <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800">Notifications</span>
-                <span className="text-[10px] text-violet-600 font-medium cursor-pointer" onClick={markNotificationsRead}>
+                <button disabled={notifications.length === 0} className="text-[10px] text-violet-600 font-medium disabled:opacity-50" onClick={markNotificationsRead}>
                   Mark all read
-                </span>
+                </button>
               </div>
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                {notifications.length === 0 && <p className="p-3 text-xs text-slate-500">Notifications are not connected. Use My Requests for saved updates.</p>}
                 {notifications.map(n => (
                   <div key={n.id} className="p-3 hover:bg-slate-50 transition-colors rounded-xl text-xs space-y-1">
                     <div className="flex items-center justify-between">
@@ -102,12 +107,13 @@ export function Topbar() {
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-2 py-1 px-1.5 rounded-full hover:bg-slate-100 transition-all text-xs font-semibold text-slate-800"
           >
-            <img
+            {portraitFailed ? <span aria-hidden="true" className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold flex-none">{currentUser.avatar}</span> : <img
               src={ARJUN_PORTRAIT}
               alt=""
+              onError={() => setPortraitFailed(true)}
               className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200 shadow-2xs"
-            />
-            <span className="text-xs font-bold text-slate-800">{currentUser.name}</span>
+            />}
+            <span className="text-xs font-bold text-slate-800 max-w-[8rem] truncate">{currentUser.name}</span>
             <ChevronDown size={14} className="text-slate-400" />
           </button>
 
@@ -138,7 +144,7 @@ export function Topbar() {
                 <User size={15} />
                 <div>
                   <div>Citizen Sign In</div>
-                  <div className="text-[10px] font-normal text-slate-400">Arjun Mishra (Farmer)</div>
+                  <div className="text-[10px] font-normal text-slate-400">Arjun Mishra (demo account)</div>
                 </div>
               </button>
 
@@ -155,10 +161,10 @@ export function Topbar() {
                 <ShieldCheck size={15} />
                 <div>
                   <div>Officer Sign In</div>
-                  <div className="text-[10px] font-normal text-slate-400">R. Singh (Urban Dev)</div>
+                  <div className="text-[10px] font-normal text-slate-400">R. Singh (demo account)</div>
                 </div>
               </button>
-              {session && <button onClick={() => { signOut(); setShowProfileMenu(false) }} className="w-full p-2 text-left text-xs text-rose-700">Sign out</button>}
+              {session && <button disabled={authBusy} onClick={() => { signOut(); setShowProfileMenu(false) }} className="w-full p-2 text-left text-xs text-rose-700">Sign out</button>}
             </div>
           )}
         </div>

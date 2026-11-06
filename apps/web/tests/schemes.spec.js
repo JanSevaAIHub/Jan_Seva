@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const url = 'https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44'
-const text = readFileSync(fileURLToPath(new URL('../../../data/scheme_sources/ssy.txt', import.meta.url)), 'utf8')
+const text = readFileSync(fileURLToPath(new URL('../../../data/scheme_sources/ssy.txt', import.meta.url)), 'utf8').replace(/\r\n/g, '\n')
 const record = {
   id: 'c1260767-8d0a-4cb2-bcbe-c3395583b9ee', title: 'Sukanya Samriddhi Yojana (SSY)', state: 'National',
   category: 'Savings', description: 'Government small-savings account for a girl child.', source_url: url,

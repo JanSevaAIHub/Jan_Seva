@@ -28,6 +28,8 @@ export function Officer() {
     setOfficerTicketModal,
     loadComplaint,
     refreshComplaints,
+    complaintsLoading,
+    complaintsError,
     routingItems,
     handleRouteAction,
     addToast
@@ -51,6 +53,7 @@ export function Officer() {
     (deptFilter === 'all' || ticket.categoryCode === deptFilter) &&
     Date.now() - new Date(ticket.created_at).getTime() <= days * 86400000) : []
   const countStatus = status => queue.filter(t => t.status === status).length
+  const queueUnavailable = complaintsLoading || Boolean(complaintsError)
   const kpis = {
     totalRequests: queue.length, pendingReview: countStatus('LOCAL_SUBMITTED'),
     inProgress: countStatus('IN_PROGRESS'), resolved: countStatus('RESOLVED'),
@@ -87,6 +90,7 @@ export function Officer() {
     <div className="space-y-5">
       <ComplaintFeedback />
       {detailError && <p role="alert" className="text-xs text-rose-700">{detailError}</p>}
+      {complaintsError && <p className="text-xs text-slate-500">Counts are unavailable. Any charts or rows shown reflect previously loaded records until refresh succeeds.</p>}
       {/* Header and Filter Row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
@@ -143,7 +147,7 @@ export function Officer() {
             <span>Total Requests</span>
             <span className="p-1 rounded-lg bg-blue-50 text-blue-600"><Layers size={15} /></span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{kpis.totalRequests.toLocaleString()}</div>
+          <div className="text-2xl font-black text-slate-900">{queueUnavailable ? '-' : kpis.totalRequests.toLocaleString()}</div>
           <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
             <span>Authorized queue</span>
             <span className="text-slate-400 font-normal ml-1">Current filter</span>
@@ -155,7 +159,7 @@ export function Officer() {
             <span>Pending Review</span>
             <span className="p-1 rounded-lg bg-amber-50 text-amber-600"><Clock size={15} /></span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{kpis.pendingReview}</div>
+          <div className="text-2xl font-black text-slate-900">{queueUnavailable ? '-' : kpis.pendingReview}</div>
           <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
             <span>Authorized queue</span>
             <span className="text-slate-400 font-normal ml-1">Current filter</span>
@@ -167,7 +171,7 @@ export function Officer() {
             <span>In Progress</span>
             <span className="p-1 rounded-lg bg-teal-50 text-teal-600"><GitBranch size={15} /></span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{kpis.inProgress}</div>
+          <div className="text-2xl font-black text-slate-900">{queueUnavailable ? '-' : kpis.inProgress}</div>
           <div className="text-[11px] font-bold text-indigo-600 flex items-center gap-0.5">
             <span>Authorized queue</span>
             <span className="text-slate-400 font-normal ml-1">Current filter</span>
@@ -179,7 +183,7 @@ export function Officer() {
             <span>Resolved</span>
             <span className="p-1 rounded-lg bg-emerald-50 text-emerald-600"><CheckCircle2 size={15} /></span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{kpis.resolved}</div>
+          <div className="text-2xl font-black text-slate-900">{queueUnavailable ? '-' : kpis.resolved}</div>
           <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
             <span>Authorized queue</span>
             <span className="text-slate-400 font-normal ml-1">Current filter</span>
@@ -191,7 +195,7 @@ export function Officer() {
             <span>Under Review</span>
             <span className="p-1 rounded-lg bg-violet-50 text-violet-600"><TrendingUp size={15} /></span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{kpis.underReview}</div>
+          <div className="text-2xl font-black text-slate-900">{queueUnavailable ? '-' : kpis.underReview}</div>
           <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
             <span>Authorized queue</span>
             <span className="text-slate-400 font-normal ml-1">Current filter</span>
@@ -344,7 +348,7 @@ export function Officer() {
               Department Routing (AI)
             </h3>
             <span className="text-[10px] text-violet-600 font-bold bg-violet-50 px-2 py-0.5 rounded-full">
-              Automated Triage
+              Not enabled
             </span>
           </div>
 
@@ -384,7 +388,7 @@ export function Officer() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
             <Sparkles size={15} className="text-violet-600" />
-            <span>AI Operational Insights</span>
+            <span>Queue Overview (AI unavailable)</span>
           </div>
 
           <ul className="space-y-2.5 text-xs text-slate-600 leading-relaxed pt-1">
@@ -411,7 +415,7 @@ export function Officer() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3 px-4">Request ID</th>
@@ -425,7 +429,7 @@ export function Officer() {
             <tbody className="divide-y divide-slate-100">
               {queue.map(t => (
                 <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-violet-700">{t.id}</td>
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-700 whitespace-nowrap">{t.id}</td>
                   <td className="py-3.5 px-4 font-medium text-slate-900 max-w-xs truncate">{t.title}</td>
                   <td className="py-3.5 px-4 text-slate-600">{t.locality.split(',')[0]}</td>
                   <td className="py-3.5 px-4">

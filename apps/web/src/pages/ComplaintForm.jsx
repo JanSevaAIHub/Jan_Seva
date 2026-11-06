@@ -34,15 +34,13 @@ export function ComplaintForm() {
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
   
   // Form fields
-  const [title, setTitle] = useState('Streetlight not working near City Park')
+  const [title, setTitle] = useState('')
   const [category, setCategory] = useState('Streetlight & Public Lighting')
-  const [description, setDescription] = useState(
-    'The streetlight on Ward 12, near City Park main gate, has not been working for the last 5 days, causing severe safety issues at night.'
-  )
-  const [locality, setLocality] = useState('City Park, Ward 12, Civil Lines, Lucknow, UP')
+  const [description, setDescription] = useState('')
+  const [locality, setLocality] = useState('')
   const [priority, setPriority] = useState('Medium')
   const [hasPhoto, setHasPhoto] = useState(false)
-  const [aiDetected, setAiDetected] = useState(true)
+  const [aiDetected, setAiDetected] = useState(false)
 
   // Auto-detect category from title typing
   const handleTitleChange = (val) => {
@@ -136,7 +134,7 @@ export function ComplaintForm() {
               </label>
               <button
                 type="button"
-                onClick={() => handleTitleChange('Overflowing sewer pipe on Ward 8')}
+                onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false) }}
                 className="text-[10px] text-violet-600 hover:underline"
               >
                 Load sample
@@ -163,7 +161,7 @@ export function ComplaintForm() {
               {aiDetected && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
                   <Sparkles size={11} className="text-violet-600" />
-                  Suggested Category (Editable)
+                  Keyword suggestion (editable)
                 </span>
               )}
             </div>
@@ -216,7 +214,7 @@ export function ComplaintForm() {
                 onClick={() => addToast('Map preview only. Enter your locality below; GPS is not connected.', 'info')}
                 className="text-[10px] font-semibold text-violet-600 hover:underline"
               >
-                Edit Pin
+                Map preview only
               </button>
             </div>
 
@@ -235,6 +233,8 @@ export function ComplaintForm() {
 
             <input
               type="text"
+              aria-label="Locality"
+              placeholder="Enter locality or landmark"
               value={locality}
               required
               minLength={2}
@@ -251,9 +251,9 @@ export function ComplaintForm() {
             </label>
             <div className="grid grid-cols-3 gap-2.5">
               {[
-                { label: 'Low', time: '> 7 days', tone: 'text-slate-700' },
-                { label: 'Medium', time: '3-5 days', tone: 'text-violet-700' },
-                { label: 'High', time: '< 24 hrs', tone: 'text-rose-600' }
+                { label: 'Low', time: 'Preview only', tone: 'text-slate-700' },
+                { label: 'Medium', time: 'Preview only', tone: 'text-violet-700' },
+                { label: 'High', time: 'Preview only', tone: 'text-rose-600' }
               ].map(p => (
                 <button
                   key={p.label}
@@ -272,6 +272,7 @@ export function ComplaintForm() {
             </div>
           </div>
 
+          <p className="text-[11px] text-slate-500">Priority and response-time estimates are not assessed or saved in this phase.</p>
           {/* Upload Evidence */}
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
@@ -289,7 +290,7 @@ export function ComplaintForm() {
                     type="button"
                     onClick={() => {
                       setHasPhoto(false)
-                      addToast('Removed photo evidence', 'info')
+                      addToast('Sample preview hidden. No attachment was uploaded.', 'info')
                     }}
                     className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
                   >
@@ -306,7 +307,7 @@ export function ComplaintForm() {
                   className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 hover:border-violet-400 flex flex-col items-center justify-center text-slate-400 hover:text-violet-600 transition-colors"
                 >
                   <Upload size={18} />
-                  <span className="text-[9px] font-bold mt-1">Upload</span>
+                  <span className="text-[9px] font-bold mt-1">Preview</span>
                 </button>
               )}
 
@@ -325,11 +326,13 @@ export function ComplaintForm() {
             </div>
           </div>
 
+          <p className="text-[11px] text-slate-500">Draft storage is unavailable. Your values stay in this form for review or retry; refreshing clears unsaved values.</p>
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => addToast('Your draft stays in this form while you review or retry. Browser refresh clears an unsaved draft.', 'info')}
+              disabled
+              title="Draft storage is unavailable; form values remain while you review or retry."
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50"
             >
               Save as Draft
@@ -358,7 +361,7 @@ export function ComplaintForm() {
 
             {/* Ticket Card Details */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-              <div className="text-xs font-bold text-violet-700">{activeComplaint?.id}</div>
+              <div className="text-xs font-bold text-violet-700 break-all">{activeComplaint?.id}</div>
               <div className="text-xs font-semibold text-slate-800">{activeComplaint?.title}</div>
               <div className="text-[11px] text-slate-500">{activeComplaint?.locality}</div>
             </div>
@@ -402,6 +405,7 @@ export function ComplaintForm() {
             <div className="pt-3 border-t border-slate-100">
               <button
                 type="button"
+                disabled={!activeComplaint}
                 onClick={() => setPackageModalComplaint(activeComplaint)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-all"
               >

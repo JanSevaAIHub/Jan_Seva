@@ -159,6 +159,7 @@ a {
 
 /* App Main Content Area */
 .app-main {
+  min-width: 0;
   margin-left: 240px;
   min-height: 100vh;
   flex: 1;
@@ -183,10 +184,28 @@ a {
 }
 
 .page-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin: 0 auto;
   max-width: 1400px;
   width: 100%;
   padding: 24px clamp(18px, 3.5vw, 42px) 40px;
+}
+
+/* Allow long saved UUIDs and grid/table content to wrap or scroll inside cards. */
+.page-content .grid > * {
+  min-width: 0;
+}
+
+.page-content input,
+.page-content textarea,
+[role="dialog"] input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[role="dialog"] {
+  overflow-wrap: anywhere;
 }
 
 /* Responsive adjustments */
@@ -221,12 +240,16 @@ a {
   .sidebar-nav {
     display: flex;
     flex-direction: row;
-    justify-content: space-around;
+    justify-content: flex-start;
+    overflow-x: auto;
+    gap: 6px;
     align-items: center;
     height: 100%;
   }
 
   .nav-link {
+    flex: 0 0 auto;
+    min-width: 62px;
     flex-direction: column;
     font-size: 10px;
     gap: 3px;
@@ -254,6 +277,16 @@ a {
 
   .page-content {
     padding: 16px 14px 40px;
+  }
+
+  .topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .topbar > div:last-child {
+    min-width: 0;
+    gap: 8px;
   }
 }
 

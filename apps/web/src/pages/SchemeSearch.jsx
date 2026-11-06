@@ -59,7 +59,8 @@ export function SchemeSearch() {
   const handleSendChat = async event => {
     event?.preventDefault()
     if (!chatInput.trim() || isAiTyping) return
-    if (await sendChatMessage(chatInput, sectorFilter)) setChatInput('')
+    const question = chatInput
+    if (await sendChatMessage(question, sectorFilter)) setChatInput(current => current === question ? '' : current)
   }
 
   const filteredSchemes = schemes.filter(scheme => {
@@ -240,8 +241,8 @@ export function SchemeSearch() {
         {/* ================= MIDDLE COLUMN: Scheme Cards & Filters (5 Cols) ================= */}
         <div className="lg:col-span-5 space-y-4">
           {/* Tabs: Recommended, All, Saved */}
-          <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex gap-1">
+          <div className="flex flex-wrap items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-wrap gap-1">
               <button
                 onClick={() => setActiveTab('recommended')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${

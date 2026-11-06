@@ -1,20 +1,10 @@
 import { test, expect } from '@playwright/test'
+import { login } from './helpers/auth.js'
 
 test.beforeEach(async ({ page }) => {
   // External decorative images do not participate in complaint persistence.
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
 })
-
-async function login(page, role) {
-  await page.locator('header').getByRole('button', { name: /Guest|Arjun Mishra|R. Singh/ }).click()
-  await page.getByRole('button', { name: role === 'officer' ? 'Officer Sign In' : 'Citizen Sign In', exact: true }).last().click()
-  const modal = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /Sign in/ }) })
-  await modal.getByLabel('Email').fill(role === 'officer' ? 'singh@example.test' : 'arjun@example.test')
-  await modal.getByLabel('Password').fill(process.env.E2E_AUTH_PASSWORD)
-  await modal.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(modal).toBeHidden()
-  await expect(page.locator('header').getByRole('button', { name: role === 'officer' ? 'R. Singh' : 'Arjun Mishra', exact: true })).toBeVisible()
-}
 
 test('citizen submits, officer updates, citizen returns and refresh retains ticket and audit', async ({ page }) => {
   const errors = []
@@ -24,6 +14,7 @@ test('citizen submits, officer updates, citizen returns and refresh retains tick
   await login(page, 'citizen')
   await page.getByPlaceholder('e.g. Streetlight not working near City Park').fill('[SYNTHETIC] Browser journey streetlight')
   await page.getByPlaceholder('Describe what happened, exact location landmark, and when it started...').fill('Synthetic demonstration only: browser workflow streetlight complaint.')
+  await page.getByLabel('Locality', { exact: true }).fill('[SYNTHETIC] Browser Test Ward')
   await page.getByRole('button', { name: 'Submit Complaint', exact: true }).click()
   const review = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Review Before Submission' }) })
   // Simulated network failure must leave the review and original draft intact.
@@ -72,10 +63,16 @@ test('citizen submits, officer updates, citizen returns and refresh retains tick
 })
 
 test('guest and citizen cannot acquire an officer queue through the role UI', async ({ page }) => {
+  let authorization
+  page.on('request', request => { if (request.url().endsWith('/api/me')) authorization = request.headers().authorization })
   await page.goto('/officer')
   await expect(page.getByText('A verified officer account is required')).toBeVisible()
   await expect(page.getByRole('table')).toHaveCount(0)
   await login(page, 'citizen')
+  const forbidden = await page.request.patch('http://127.0.0.1:8765/api/officer/complaints/00000000-0000-0000-0000-000000000000', { headers: { Authorization: authorization }, data: { status: 'UNDER_REVIEW' } })
+  expect(forbidden.status()).toBe(403)
+  const anonymous = await page.request.post('http://127.0.0.1:8765/api/complaints', { data: {} })
+  expect(anonymous.status()).toBe(401)
   await expect(page.getByText('A verified officer account is required')).toBeVisible()
   await expect(page.getByRole('table')).toHaveCount(0)
 })

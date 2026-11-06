@@ -18,34 +18,35 @@ import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 export function TrackStatus() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialId = searchParams.get('id') || ''
+  const initialId = (searchParams.get('id') || '').trim().toLowerCase()
   const { complaints, activeComplaint, session, loadComplaint, setPackageModalComplaint } = useApp()
   const [searchId, setSearchId] = useState(initialId)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
+  const [reload, setReload] = useState(0)
   const selectedTicket = initialId ? complaints.find(c => c.id === initialId) : activeComplaint
 
   useEffect(() => {
     setSearchId(initialId)
     setDetailError('')
-    if (!initialId || !session) return
+    if (!initialId || !session) { setDetailLoading(false); return }
     let cancelled = false
     setDetailLoading(true)
     loadComplaint(initialId).catch(error => {
       if (!cancelled) setDetailError(error.message)
     }).finally(() => { if (!cancelled) setDetailLoading(false) })
     return () => { cancelled = true }
-  }, [initialId, session?.access_token])
+  }, [initialId, session?.access_token, loadComplaint, reload])
 
   const handleSearch = event => {
     event.preventDefault()
-    if (searchId.trim()) setSearchParams({ id: searchId.trim().toLowerCase() })
+    if (searchId.trim()) { setSearchParams({ id: searchId.trim().toLowerCase() }); setReload(value => value + 1) }
   }
 
   return (
     <div className="space-y-6">
       <ComplaintFeedback />
-      {detailLoading && <p className="text-xs" role="status">Loading ticket details?</p>}
+      {detailLoading && <p className="text-xs" role="status">Loading ticket details...</p>}
       {detailError && <p className="text-xs text-rose-700" role="alert">{detailError}</p>}
       {/* Header */}
       <div>
@@ -111,7 +112,7 @@ export function TrackStatus() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left: Summary Card */}
           <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-mono text-sm font-bold text-violet-700 bg-violet-50 px-3 py-1 rounded-xl border border-violet-100">
                 {selectedTicket.id}
               </span>
@@ -133,8 +134,8 @@ export function TrackStatus() {
 
             <div className="grid grid-cols-2 gap-3 text-xs pt-1">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[11px] text-slate-400 block mb-0.5">Assigned Department</span>
-                <span className="font-bold text-slate-800">{selectedTicket.department || 'Urban Infrastructure Dept'}</span>
+                <span className="text-[11px] text-slate-400 block mb-0.5">Officer assignment</span>
+                <span className="font-bold text-slate-800">{selectedTicket.department || 'Not recorded'}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-[11px] text-slate-400 block mb-0.5">Priority Level</span>

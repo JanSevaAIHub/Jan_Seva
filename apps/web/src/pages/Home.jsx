@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Search,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import heroBg from '../assets/hero-bg.png'
+import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 const PROMPT_CHIPS = [
   '✦ PM Kisan eligibility',
@@ -28,14 +29,15 @@ const PROMPT_CHIPS = [
 
 export function Home() {
   const navigate = useNavigate()
-  const { setSchemeSearchQuery, sendChatMessage, complaints, setActiveSchemeModal, schemes } = useApp()
+  const { setSchemeSearchQuery, complaints, schemes, loadSchemes, currentUser,
+    complaintsLoading, complaintsError, schemesLoading, schemesError } = useApp()
+  useEffect(() => { loadSchemes() }, [loadSchemes])
   const [query, setQuery] = useState('')
 
   const handleSearch = (e) => {
     e?.preventDefault()
     if (!query.trim()) return
     setSchemeSearchQuery(query)
-    sendChatMessage(query)
     navigate('/schemes')
   }
 
@@ -44,10 +46,9 @@ export function Home() {
     if (text.toLowerCase().includes('road') || text.toLowerCase().includes('complaint')) {
       navigate('/complaints/new')
     } else if (text.toLowerCase().includes('track')) {
-      navigate('/requests')
+      navigate('/track')
     } else {
       setSchemeSearchQuery(text)
-      sendChatMessage(text)
       navigate('/schemes')
     }
   }
@@ -74,7 +75,7 @@ export function Home() {
               <span>Citizen Services Assistant</span>
             </h1>
             <p className="text-xs md:text-sm text-slate-600 leading-relaxed max-w-md pt-1">
-              Discover schemes, check eligibility, raise complaints and track requests — all in one place.
+              Discover schemes, review published conditions, raise complaints and track requests — all in one place.
             </p>
           </div>
 
@@ -83,31 +84,35 @@ export function Home() {
             {/* Header */}
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#4338ca]">
               <Sparkles size={15} className="text-[#6552ce]" />
-              <span>Ask JanSeva AI</span>
+              <span>Search reviewed schemes</span>
             </div>
 
+            <p className="text-[11px] text-slate-500">Scheme search only. General-purpose chat and voice are not available here; ask source-grounded scheme questions on the next page.</p>
             {/* Input Row */}
             <form onSubmit={handleSearch} className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-full px-4 py-1.5 shadow-sm focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
               <Search size={17} className="text-slate-400 flex-none" />
               <input
                 type="text"
                 value={query}
+                minLength={3}
+                maxLength={1000}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search for schemes, eligibility, documents or raise a complaint..."
+                placeholder="Search for schemes or published conditions..."
                 className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none py-1"
               />
               <button
                 type="button"
-                onClick={() => handleChip('✦ PM Kisan eligibility')}
+                disabled
                 className="p-1.5 text-slate-400 hover:text-violet-600 rounded-full hover:bg-slate-100 transition-colors"
-                title="Voice input"
+                title="Voice input is not available"
               >
                 <Mic size={17} />
               </button>
               <button
                 type="submit"
                 className="flex-none w-8 h-8 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95"
-                aria-label="Send query"
+                aria-label="Search schemes"
+                disabled={query.trim().length < 3}
               >
                 <ArrowRight size={15} />
               </button>
@@ -166,7 +171,7 @@ export function Home() {
               Check Eligibility
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Know if you qualify and required documents
+              Review published conditions; personal eligibility assessment is unavailable
             </p>
           </div>
           <div className="self-end mt-2 text-violet-600 group-hover:translate-x-1 transition-transform">
@@ -187,7 +192,7 @@ export function Home() {
               Raise Complaint
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Report civic issues with photo &amp; location
+              Report civic issues and locality for internal tracking
             </p>
           </div>
           <div className="self-end mt-2 text-orange-500 group-hover:translate-x-1 transition-transform">
@@ -197,7 +202,7 @@ export function Home() {
 
         {/* 4. Track Requests */}
         <Link
-          to="/requests"
+          to="/track"
           className="group relative p-5 bg-white rounded-2xl border border-slate-200/80 hover:border-sky-300 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between min-h-[148px]"
         >
           <div>
@@ -208,7 +213,7 @@ export function Home() {
               Track Requests
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Get real-time updates on your applications
+              View your saved tickets and internal status updates
             </p>
           </div>
           <div className="self-end mt-2 text-sky-600 group-hover:translate-x-1 transition-transform">
@@ -222,6 +227,7 @@ export function Home() {
         {/* Left: Platform at a Glance */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
           <h3 className="text-sm font-bold text-slate-900">Platform at a Glance</h3>
+          <p className="text-[11px] text-slate-500">Loaded records for this account. Platform-wide statistics are not available.</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             {/* Citizens Served */}
@@ -229,8 +235,8 @@ export function Home() {
               <div className="w-10 h-10 rounded-full bg-[#f3f0ff] text-[#7c3aed] flex items-center justify-center mb-2 shadow-xs">
                 <Users size={18} />
               </div>
-              <div className="text-lg font-black text-slate-900">12.8 L+</div>
-              <div className="text-[11px] text-slate-500 font-medium">Citizens Served</div>
+              <div className="text-lg font-black text-slate-900">{currentUser.role === 'guest' ? 'Guest' : currentUser.role}</div>
+              <div className="text-[11px] text-slate-500 font-medium">Account role</div>
             </div>
 
             {/* Govt Schemes */}
@@ -238,8 +244,8 @@ export function Home() {
               <div className="w-10 h-10 rounded-full bg-[#eef2ff] text-[#4f46e5] flex items-center justify-center mb-2 shadow-xs">
                 <Database size={18} />
               </div>
-              <div className="text-lg font-black text-slate-900">540+</div>
-              <div className="text-[11px] text-slate-500 font-medium">Govt. Schemes</div>
+              <div className="text-lg font-black text-slate-900">{schemesLoading || schemesError ? '-' : schemes.length}</div>
+              <div className="text-[11px] text-slate-500 font-medium">Loaded schemes</div>
             </div>
 
             {/* Requests Processed */}
@@ -247,8 +253,8 @@ export function Home() {
               <div className="w-10 h-10 rounded-full bg-[#fff7ed] text-[#ea580c] flex items-center justify-center mb-2 shadow-xs">
                 <ClipboardList size={18} />
               </div>
-              <div className="text-lg font-black text-slate-900">18.4 L+</div>
-              <div className="text-[11px] text-slate-500 font-medium">Requests Processed</div>
+              <div className="text-lg font-black text-slate-900">{complaintsLoading || complaintsError ? '-' : complaints.length}</div>
+              <div className="text-[11px] text-slate-500 font-medium">Accessible tickets</div>
             </div>
 
             {/* On-time Resolution */}
@@ -256,79 +262,41 @@ export function Home() {
               <div className="w-10 h-10 rounded-full bg-[#ecfdf5] text-[#059669] flex items-center justify-center mb-2 shadow-xs">
                 <CheckCircle2 size={18} />
               </div>
-              <div className="text-lg font-black text-slate-900">96%</div>
-              <div className="text-[11px] text-slate-500 font-medium">On-time Resolution</div>
+              <div className="text-lg font-black text-slate-900">{complaintsLoading || complaintsError ? '-' : complaints.filter(c => c.status === 'RESOLVED').length}</div>
+              <div className="text-[11px] text-slate-500 font-medium">Internally resolved</div>
             </div>
           </div>
         </div>
 
-        {/* Right: Your Recent Activity */}
+        {/* Right: Your Recent Tickets */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Your Recent Activity</h3>
+            <h3 className="text-sm font-bold text-slate-900">Your Recent Tickets</h3>
             <Link to="/requests" className="text-xs font-semibold text-violet-600 hover:text-violet-800 flex items-center gap-0.5">
               <span>View All</span>
               <ArrowRight size={13} />
             </Link>
           </div>
 
+          <ComplaintFeedback />
+          {schemesError && <p role="alert" className="text-xs text-rose-700">{schemesError} <button onClick={() => loadSchemes()} className="underline">Retry schemes</button></p>}
           <div className="space-y-2.5">
-            {/* Item 1 */}
-            <div 
-              onClick={() => navigate('/requests')}
-              className="p-3 rounded-xl bg-slate-50/70 hover:bg-violet-50/50 border border-slate-100 transition-all cursor-pointer flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-none">
-                  <CheckCircle2 size={16} />
+            {complaints.slice(0, 3).map(ticket => (
+              <Link key={ticket.id} to={`/track?id=${ticket.id}`} className="p-3 rounded-xl bg-slate-50/70 hover:bg-violet-50/50 border border-slate-100 transition-all flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-none">
+                    {ticket.status === 'RESOLVED' ? <CheckCircle2 size={16} /> : <ClipboardList size={16} />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900">{ticket.title}</div>
+                    <div className="text-[11px] text-slate-500 break-all">{ticket.id}</div>
+                    <div className="text-[11px] text-slate-500">{ticket.submittedAt}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">Water supply issue - Resolved</div>
-                  <div className="text-[11px] text-slate-500">REQ-2025-11428 &bull; Resolved on 18 Jan</div>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e6f4ea] text-[#137333]">
-                Resolved
-              </span>
-            </div>
-
-            {/* Item 2 */}
-            <div 
-              onClick={() => setActiveSchemeModal(schemes[0])}
-              className="p-3 rounded-xl bg-slate-50/70 hover:bg-violet-50/50 border border-slate-100 transition-all cursor-pointer flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center flex-none">
-                  <FileText size={16} />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">PM Kisan - Eligibility Check</div>
-                  <div className="text-[11px] text-slate-500">All assessment completed</div>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e6f4ea] text-[#137333]">
-                Eligible
-              </span>
-            </div>
-
-            {/* Item 3 */}
-            <div 
-              onClick={() => setActiveSchemeModal(schemes[1])}
-              className="p-3 rounded-xl bg-slate-50/70 hover:bg-violet-50/50 border border-slate-100 transition-all cursor-pointer flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center flex-none">
-                  <Bookmark size={16} />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">Scholarship Scheme - Saved</div>
-                  <div className="text-[11px] text-slate-500">Saved for later</div>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e8f0fe] text-[#1a73e8]">
-                Saved
-              </span>
-            </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e6f4ea] text-[#137333]">{ticket.status.replaceAll('_', ' ')}</span>
+              </Link>
+            ))}
+            {!complaintsLoading && !complaintsError && complaints.length === 0 && <p className="text-xs text-slate-500">No saved tickets are loaded. Create a complaint or sign in to view your records.</p>}
           </div>
         </div>
       </section>

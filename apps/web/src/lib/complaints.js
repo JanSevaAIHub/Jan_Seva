@@ -11,6 +11,13 @@ export function complaintInput(draft) {
 }
 
 export function complaintView(record) {
+  if (!record || ['id', 'title', 'description', 'category', 'status', 'locality'].some(key => typeof record[key] !== 'string') ||
+    typeof record.created_at !== 'string' || !Number.isFinite(Date.parse(record.created_at)) ||
+    (record.official_ref != null && typeof record.official_ref !== 'string') || !Array.isArray(record.events) ||
+    record.events.some(event => !event || typeof event.new_status !== 'string' || typeof event.note !== 'string' ||
+      typeof event.actor_id !== 'string' || !Number.isFinite(Date.parse(event.event_time)))) {
+    throw new Error('The API returned an invalid ticket. Refresh My Requests before trying another submission.')
+  }
   const events = record.events || []
   return {
     ...record, categoryCode: record.category, category: CATEGORY_LABELS[record.category] || record.category,
