@@ -28,15 +28,15 @@ Use Python 3.11+ and a Vite-compatible Node version (20.19+ or 22.12+). Verifica
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r services/api/requirements.txt
-Copy-Item .env.example services/api/.env
-Copy-Item apps/web/.env.example apps/web/.env
+if (!(Test-Path services/api/.env)) { Copy-Item .env.example services/api/.env }
+if (!(Test-Path apps/web/.env)) { Copy-Item apps/web/.env.example apps/web/.env }
 npm.cmd ci --prefix apps/web
 Set-Location apps/web
 npx.cmd playwright install chromium
 Set-Location ../..
 ```
 
-Never commit filled `.env` files. The backend loads `services/api/.env`; process environment takes precedence. Vite reads `apps/web/.env` and needs a restart after changes.
+For hidden local credential prompts, use `python -m app.scripts.configure_supabase` with `PYTHONPATH=services/api`; see [Supabase dashboard/private setup](docs/supabase-setup.md). Never commit filled `.env` files. The backend loads `services/api/.env`; process environment takes precedence. Vite reads `apps/web/.env` and needs a restart after changes.
 
 ## Configuration
 
@@ -44,7 +44,8 @@ Never commit filled `.env` files. The backend loads `services/api/.env`; process
 |---|---|
 | `DATABASE_URL` | Server: actual PostgreSQL connection; no production fallback database |
 | `SUPABASE_URL` | Server: trusted project URL for JWT issuer and JWKS |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server/operator only: demo provisioning, not browser login |
+| `SUPABASE_SECRET_KEY` | Preferred server/operator key (`sb_secret_...`): demo provisioning, not browser login |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional legacy service_role JWT fallback; leave blank when using the preferred key |
 | `OPENAI_API_KEY` | Server only: embeddings and answer selection |
 | `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Server: available model and actual positive output dimension |
 | `LLM_MODEL` | Server: available Responses model supporting strict JSON-schema output |
@@ -131,7 +132,7 @@ npm.cmd --prefix apps/web run test:e2e
 npm.cmd --prefix apps/web run build
 ```
 
-Final results: **109 backend passed, 1 live test skipped; 9 client passed; 18 Chromium browser passed; builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. Actual release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
+Final results: **114 backend passed, 1 live test skipped; 9 client passed; 18 Chromium browser passed; builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. Actual release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
 
 After setup, sign in as Arjun, load schemes, ask a question and open its official citation. Submit a complaint, retain the returned UUID, check My Requests and refresh. In a separate browser profile, sign in as R. Singh, open the assigned UUID and advance its status with a note. Refresh Arjun's tracking page and confirm persistent status/history. Then run the live gate:
 

@@ -56,7 +56,9 @@ def get_settings() -> Settings:
     return Settings(
         database_url=environ.get("DATABASE_URL", "").strip(),
         supabase_url=environ.get("SUPABASE_URL", "").strip(),
-        supabase_service_role_key=environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+        # Preferred opaque server key; retain the legacy environment alias.
+        supabase_service_role_key=(environ.get("SUPABASE_SECRET_KEY", "").strip()
+            or environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()),
         embedding_model=environ.get("EMBEDDING_MODEL", "").strip(),
         embedding_dimensions=dimensions,
         demo_citizen_user_id=environ.get("DEMO_CITIZEN_USER_ID", "").strip(),

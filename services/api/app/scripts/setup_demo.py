@@ -39,11 +39,18 @@ def demo_accounts() -> list[DemoAccount]:
 def admin_client() -> httpx.Client:
     settings = get_settings()
     if not settings.supabase_service_role_key:
-        raise ConfigurationError("SUPABASE_SERVICE_ROLE_KEY is required for explicit demo setup/lookup.")
+        raise ConfigurationError("SUPABASE_SECRET_KEY (or legacy SUPABASE_SERVICE_ROLE_KEY) is required for explicit demo setup/lookup.")
+    key = settings.supabase_service_role_key
+    if key.startswith("sb_publishable_"):
+        raise ConfigurationError("Use a backend secret key for demo setup, not the browser publishable key.")
+    headers = {"apikey": key}
+    # Opaque sb_secret_ keys are not JWTs. Only legacy service-role JWTs
+    # belong in Authorization; current keys authenticate through apikey.
+    if not key.startswith("sb_secret_"):
+        headers["Authorization"] = "Bearer " + key
     return httpx.Client(
         base_url=settings.auth_issuer + "/", timeout=10, follow_redirects=False,
-        headers={"apikey": settings.supabase_service_role_key,
-                 "Authorization": "Bearer " + settings.supabase_service_role_key},
+        headers=headers,
     )
 
 
