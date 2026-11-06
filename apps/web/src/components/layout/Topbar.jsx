@@ -8,6 +8,8 @@ export function Topbar() {
   const {
     currentUser,
     switchUserRole,
+    session,
+    signOut,
     notifications,
     markNotificationsRead
   } = useApp()
@@ -102,10 +104,10 @@ export function Topbar() {
           >
             <img
               src={ARJUN_PORTRAIT}
-              alt="Arjun M."
+              alt=""
               className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200 shadow-2xs"
             />
-            <span className="text-xs font-bold text-slate-800">{currentUser.name.split(' ')[0]} M.</span>
+            <span className="text-xs font-bold text-slate-800">{currentUser.name}</span>
             <ChevronDown size={14} className="text-slate-400" />
           </button>
 
@@ -120,10 +122,11 @@ export function Topbar() {
               </div>
 
               <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Switch Demo Persona
+                Sign in to an account
               </div>
 
               <button
+                aria-label="Citizen Sign In"
                 onClick={() => {
                   switchUserRole('citizen')
                   setShowProfileMenu(false)
@@ -134,12 +137,13 @@ export function Topbar() {
               >
                 <User size={15} />
                 <div>
-                  <div>Citizen View</div>
+                  <div>Citizen Sign In</div>
                   <div className="text-[10px] font-normal text-slate-400">Arjun Mishra (Farmer)</div>
                 </div>
               </button>
 
               <button
+                aria-label="Officer Sign In"
                 onClick={() => {
                   switchUserRole('officer')
                   setShowProfileMenu(false)
@@ -150,10 +154,11 @@ export function Topbar() {
               >
                 <ShieldCheck size={15} />
                 <div>
-                  <div>Demo Officer View</div>
+                  <div>Officer Sign In</div>
                   <div className="text-[10px] font-normal text-slate-400">R. Singh (Urban Dev)</div>
                 </div>
               </button>
+              {session && <button onClick={() => { signOut(); setShowProfileMenu(false) }} className="w-full p-2 text-left text-xs text-rose-700">Sign out</button>}
             </div>
           )}
         </div>

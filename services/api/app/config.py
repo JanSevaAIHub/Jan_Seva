@@ -23,6 +23,8 @@ class Settings:
     supabase_service_role_key: str = field(repr=False)
     embedding_model: str
     embedding_dimensions: int | None
+    demo_citizen_user_id: str = ""
+    demo_officer_user_id: str = ""
 
     @property
     def auth_issuer(self) -> str:
@@ -57,6 +59,8 @@ def get_settings() -> Settings:
         supabase_service_role_key=environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
         embedding_model=environ.get("EMBEDDING_MODEL", "").strip(),
         embedding_dimensions=dimensions,
+        demo_citizen_user_id=environ.get("DEMO_CITIZEN_USER_ID", "").strip(),
+        demo_officer_user_id=environ.get("DEMO_OFFICER_USER_ID", "").strip(),
     )
 
 

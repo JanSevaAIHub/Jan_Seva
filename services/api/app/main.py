@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from app.config import cors_origins
 from app.routers.health import router as health_router
 from app.routers.profiles import router as profiles_router
+from app.routers.complaints import router as complaints_router
+from app.routers.officer import router as officer_router
 
 app = FastAPI(
     title="JanSeva AI API",
@@ -25,6 +27,8 @@ app.add_middleware(
 
 app.include_router(health_router, prefix="/api")
 app.include_router(profiles_router, prefix="/api")
+app.include_router(complaints_router, prefix="/api")
+app.include_router(officer_router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)

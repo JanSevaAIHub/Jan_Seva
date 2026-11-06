@@ -7,3 +7,19 @@ export async function getHealth() {
 }
 
 export { apiBaseUrl }
+
+export async function apiRequest(path, accessToken, options = {}) {
+  if (!accessToken) throw new Error('Please sign in to manage complaints.')
+  const response = await fetch(`${apiBaseUrl}/api${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: `Bearer ${accessToken}` },
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const error = new Error(data?.detail?.message || (response.status === 401
+      ? 'Your session expired. Please sign in again.' : `Request failed (${response.status}).`))
+    error.status = response.status
+    throw error
+  }
+  return data
+}

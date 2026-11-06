@@ -11,5 +11,7 @@ pytest-cache-files-*/
 .env.*
 !.env.example
 coverage/
+apps/web/test-results/
+apps/web/playwright-report/
 .DS_Store
 

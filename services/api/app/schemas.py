@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from uuid import UUID
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -63,6 +64,7 @@ class ComplaintSummary(APIModel):
     created_at: datetime
     updated_at: datetime
     is_synthetic: bool
+    official_status: str = "NOT_FILED"
 
 
 class ComplaintEvent(APIModel):
@@ -81,6 +83,10 @@ class ComplaintDetail(ComplaintSummary):
 
 
 class ComplaintStatusUpdate(APIModel):
-    status: InternalStatus
-    note: str = Field(min_length=1, max_length=2000)
+    status: Literal["LOCAL_SUBMITTED", "UNDER_REVIEW", "IN_PROGRESS", "RESOLVED"]
+    note: str | None = Field(default=None, min_length=1, max_length=2000)
+
+
+class OfficialReferenceUpdate(APIModel):
+    official_ref: str = Field(min_length=1, max_length=250)
 

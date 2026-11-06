@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Compass,
@@ -14,35 +14,39 @@ import {
   ShieldCheck
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 export function TrackStatus() {
-  const [searchParams] = useSearchParams()
-  const initialId = searchParams.get('id') || 'REQ-2025-11428'
-
-  const { complaints, setPackageModalComplaint, addToast } = useApp()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialId = searchParams.get('id') || ''
+  const { complaints, activeComplaint, session, loadComplaint, setPackageModalComplaint } = useApp()
   const [searchId, setSearchId] = useState(initialId)
-  const [selectedTicket, setSelectedTicket] = useState(
-    complaints.find(c => c.id.toLowerCase() === initialId.toLowerCase()) || complaints[0]
-  )
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const selectedTicket = initialId ? complaints.find(c => c.id === initialId) : activeComplaint
 
-  const handleSearch = (e) => {
-    e?.preventDefault()
-    if (!searchId.trim()) return
+  useEffect(() => {
+    setSearchId(initialId)
+    setDetailError('')
+    if (!initialId || !session) return
+    let cancelled = false
+    setDetailLoading(true)
+    loadComplaint(initialId).catch(error => {
+      if (!cancelled) setDetailError(error.message)
+    }).finally(() => { if (!cancelled) setDetailLoading(false) })
+    return () => { cancelled = true }
+  }, [initialId, session?.access_token])
 
-    const found = complaints.find(
-      c => c.id.toLowerCase() === searchId.trim().toLowerCase()
-    )
-
-    if (found) {
-      setSelectedTicket(found)
-      addToast(`Found tracking record for ${found.id}`, 'success')
-    } else {
-      addToast(`No ticket found matching "${searchId}"`, 'warning')
-    }
+  const handleSearch = event => {
+    event.preventDefault()
+    if (searchId.trim()) setSearchParams({ id: searchId.trim().toLowerCase() })
   }
 
   return (
     <div className="space-y-6">
+      <ComplaintFeedback />
+      {detailLoading && <p className="text-xs" role="status">Loading ticket details?</p>}
+      {detailError && <p className="text-xs text-rose-700" role="alert">{detailError}</p>}
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
@@ -67,7 +71,7 @@ export function TrackStatus() {
               type="text"
               value={searchId}
               onChange={e => setSearchId(e.target.value)}
-              placeholder="Enter Request ID (e.g. REQ-2025-11428, REQ-2025-11587)..."
+              placeholder="Enter the saved ticket UUID..."
               className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none py-1 font-mono uppercase"
             />
           </div>
@@ -88,7 +92,7 @@ export function TrackStatus() {
               type="button"
               onClick={() => {
                 setSearchId(c.id)
-                setSelectedTicket(c)
+                setSearchParams({ id: c.id })
               }}
               className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
                 selectedTicket?.id === c.id
@@ -103,7 +107,7 @@ export function TrackStatus() {
       </div>
 
       {/* Ticket Details & Timeline Display */}
-      {selectedTicket ? (
+      {selectedTicket && !detailError ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left: Summary Card */}
           <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-4">
@@ -160,6 +164,12 @@ export function TrackStatus() {
                 <p className="leading-relaxed">{selectedTicket.officerNotes}</p>
               </div>
             )}
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+              <span className="text-slate-500 block">Government filing (separate from internal status)</span>
+              <span className="font-semibold">{selectedTicket.officialStatus}</span>
+              {selectedTicket.officialRef && <p>User-provided reference: {selectedTicket.officialRef} (unverified)</p>}
+            </div>
 
             <button
               type="button"

@@ -103,6 +103,10 @@ def setup_demo() -> None:
         identities = resolve_identities(client, accounts, create=True)
     with Session(get_engine()) as session, session.begin():
         provision_profiles(session, accounts, identities)
+    # Provider-issued user IDs are identifiers, not credentials. Operators may
+    # opt in to the narrowly scoped Phase 2 assignment using these exact values.
+    print(f"DEMO_CITIZEN_USER_ID={identities[Role.CITIZEN]}")
+    print(f"DEMO_OFFICER_USER_ID={identities[Role.OFFICER]}")
 
 
 if __name__ == "__main__":

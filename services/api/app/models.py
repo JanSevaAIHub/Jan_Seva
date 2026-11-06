@@ -146,6 +146,10 @@ class Complaint(Base):
     assigned_officer: Mapped[Profile | None] = relationship(back_populates="assigned_complaints", foreign_keys=[assigned_officer_id])
     events: Mapped[list["ComplaintEvent"]] = relationship(back_populates="complaint", order_by="ComplaintEvent.event_time", passive_deletes=True)
 
+    @property
+    def official_status(self) -> str:
+        return "USER_REPORTED_FILED" if self.official_ref else "NOT_FILED"
+
 
 class ComplaintEvent(Base):
     __tablename__ = "complaint_events"

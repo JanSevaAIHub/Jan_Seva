@@ -1,12 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Copy, Check, ExternalLink, ShieldCheck, FileCheck, Share2 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 
 export function ComplaintPackageModal() {
-  const { packageModalComplaint, setPackageModalComplaint, addToast } = useApp()
+  const { packageModalComplaint, setPackageModalComplaint, addToast, saveOfficialReference, currentUser } = useApp()
   const [copied, setCopied] = useState(false)
   const [officialRefInput, setOfficialRefInput] = useState('')
 
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    setOfficialRefInput(packageModalComplaint?.officialRef || '')
+    setCopied(false)
+    setError('')
+  }, [packageModalComplaint?.id])
   if (!packageModalComplaint) return null
 
   const formattedPackage = `OFFICIAL CIVIC GRIEVANCE PACKAGE (Generated via JanSeva AI)
@@ -24,28 +31,32 @@ GRIEVANCE DESCRIPTION:
 ${packageModalComplaint.description}
 
 EVIDENCE ATTACHED:
-- Photos/Location metadata verified locally
-- Priority assessment: ${packageModalComplaint.priority}
+- No attachments or location verification are provided by this ticket.
+- Internal status: ${packageModalComplaint.status}
+- Government filing: ${packageModalComplaint.officialStatus} (user reported if provided)
 
 OFFICIAL FILING CHANNELS:
 • National Grievance Portal (CPGRAMS): https://pgportal.gov.in
 • State Portal (Connect Punjab): https://connect.punjab.gov.in
 -----------------------------------------------------------`
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(formattedPackage)
-    setCopied(true)
-    addToast('Complaint package copied to clipboard!', 'success')
-    setTimeout(() => setCopied(false), 2500)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(formattedPackage)
+      setCopied(true)
+      addToast('Complaint package copied to clipboard!', 'success')
+    } catch { setError('Clipboard unavailable. Select and copy the package text manually.') }
   }
 
-  const handleSaveOfficialRef = () => {
-    if (!officialRefInput.trim()) return
-    packageModalComplaint.officialRef = officialRefInput
-    packageModalComplaint.officialStatus = 'USER_REPORTED_FILED'
-    addToast(`Saved official filing reference: ${officialRefInput}`, 'success')
-    setOfficialRefInput('')
-    setPackageModalComplaint(null)
+  const handleSaveOfficialRef = async () => {
+    if (!officialRefInput.trim() || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await saveOfficialReference(packageModalComplaint.id, officialRefInput.trim())
+      setPackageModalComplaint(null)
+    } catch (error) { setError(error.message) }
+    finally { setSaving(false) }
   }
 
   return (
@@ -76,6 +87,7 @@ OFFICIAL FILING CHANNELS:
 
         {/* Body */}
         <div className="p-6 space-y-4">
+          {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
           <div className="flex items-center justify-between bg-violet-50 p-3 rounded-xl border border-violet-100">
             <div className="text-xs text-violet-800">
               Copy this structured package and paste it into the official government grievance portal.
@@ -127,20 +139,22 @@ OFFICIAL FILING CHANNELS:
               <input
                 type="text"
                 value={officialRefInput}
+                maxLength={250}
+                disabled={currentUser.role !== 'citizen' || saving}
                 onChange={e => setOfficialRefInput(e.target.value)}
                 placeholder="e.g. CPGRAMS-2026-98124"
                 className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-violet-500 bg-white"
               />
               <button
                 onClick={handleSaveOfficialRef}
-                disabled={!officialRefInput.trim()}
+                disabled={!officialRefInput.trim() || saving || currentUser.role !== 'citizen'}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
               >
-                Save
+                {saving ? 'Saving?' : 'Save'}
               </button>
             </div>
             <p className="text-[11px] text-slate-500">
-              Adding this links your JanSeva internal ticket with your official government tracking registration.
+              This stores your reference as user reported. JanSeva does not verify government filing or resolution.
             </p>
           </div>
         </div>
