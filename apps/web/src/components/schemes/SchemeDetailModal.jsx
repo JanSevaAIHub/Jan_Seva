@@ -31,7 +31,7 @@ export function SchemeDetailModal() {
               className={`p-2 rounded-lg border transition-colors ${
                 isSaved ? 'bg-violet-50 border-violet-200 text-violet-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
               }`}
-              title={isSaved ? 'Saved to your profile' : 'Save for later'}
+              title={isSaved ? 'Saved for this browsing session' : 'Save for later'}
             >
               <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
             </button>
@@ -59,7 +59,7 @@ export function SchemeDetailModal() {
             </div>
             <div className="text-right">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                <CheckCircle2 size={13} /> {activeSchemeModal.eligibilityStatus === 'POTENTIAL' ? `Likely Eligible (${activeSchemeModal.matchPercentage}%)` : 'Needs Info'}
+                <CheckCircle2 size={13} /> Eligibility not assessed
               </span>
             </div>
           </div>
@@ -69,14 +69,14 @@ export function SchemeDetailModal() {
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                 <ShieldCheck size={16} className="text-teal-600" />
-                OFFICIAL CITATION &amp; SOURCE EVIDENCE
+                REVIEWED SUMMARY &amp; OFFICIAL SOURCE
               </span>
               <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                <Calendar size={12} /> Last verified: {activeSchemeModal.lastReviewed}
+                <Calendar size={12} /> Reviewed: {activeSchemeModal.lastReviewed}
               </span>
             </div>
             <blockquote className="text-xs text-slate-600 italic bg-white p-3 rounded-lg border border-slate-200">
-              "{activeSchemeModal.excerpt}"
+              {activeSchemeModal.excerpt}
             </blockquote>
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-slate-500">Source: <b className="text-slate-700">{activeSchemeModal.sourceTitle}</b></span>
@@ -93,7 +93,7 @@ export function SchemeDetailModal() {
 
           {/* Matched Rules */}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-2">Eligibility Criteria Matched</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-2">Published Eligibility Conditions</h3>
             <ul className="space-y-1.5">
               {activeSchemeModal.matchedRules.map((rule, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
@@ -112,7 +112,8 @@ export function SchemeDetailModal() {
 
           {/* Required Documents */}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-2">Required Application Documents</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-2">Verified Documents / Enrolment Records</h3>
+            <p className="text-xs text-slate-500 mb-2">{activeSchemeModal.documentNote} {activeSchemeModal.requiredDocuments.length === 0 ? 'No complete checklist was verified for this source.' : ''}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {activeSchemeModal.requiredDocuments.map((doc, idx) => (
                 <div key={idx} className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-700 font-medium">
@@ -138,7 +139,7 @@ export function SchemeDetailModal() {
             rel="noreferrer"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-md shadow-violet-600/20 transition-all hover:scale-[1.02]"
           >
-            Apply on Official Government Portal <ExternalLink size={14} />
+            Check Official Source &amp; Current Terms <ExternalLink size={14} />
           </a>
         </div>
       </div>

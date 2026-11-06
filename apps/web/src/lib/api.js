@@ -8,6 +8,15 @@ export async function getHealth() {
 
 export { apiBaseUrl }
 
+export async function publicApiRequest(path, options = {}) {
+  const response = await fetch(`${apiBaseUrl}/api${path}`, {
+    ...options, headers: { 'Content-Type': 'application/json', ...options.headers },
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(data?.detail?.message || `Scheme service failed (${response.status}). Please retry.`)
+  return data
+}
+
 export async function apiRequest(path, accessToken, options = {}) {
   if (!accessToken) throw new Error('Please sign in to manage complaints.')
   const response = await fetch(`${apiBaseUrl}/api${path}`, {

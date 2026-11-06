@@ -23,11 +23,11 @@ import {
   ChevronDown
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { OFFICIAL_SOURCES } from '../data/mockData'
 
 export function SchemeSearch() {
   const {
     schemes,
+    schemesLoading, schemesError, schemeChatError, loadSchemes,
     savedSchemeIds,
     toggleSaveScheme,
     setActiveSchemeModal,
@@ -37,10 +37,10 @@ export function SchemeSearch() {
     sendChatMessage,
     isAiTyping,
     currentUser,
-    selectedState
+    selectedState, setSelectedState
   } = useApp()
 
-  const [activeTab, setActiveTab] = useState('recommended') // 'recommended' | 'all' | 'saved'
+  const [activeTab, setActiveTab] = useState('all') // 'recommended' | 'all' | 'saved'
   const [sectorFilter, setSectorFilter] = useState('All')
   const [chatInput, setChatInput] = useState('')
   const chatBottomRef = useRef(null)
@@ -50,30 +50,25 @@ export function SchemeSearch() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages, isAiTyping])
 
-  const handleSendChat = (e) => {
-    e?.preventDefault()
-    if (!chatInput.trim()) return
-    sendChatMessage(chatInput)
-    setChatInput('')
+  useEffect(() => {
+    if (schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3) return
+    const timer = setTimeout(() => loadSchemes({ query: schemeSearchQuery, state: selectedState, category: sectorFilter }), 300)
+    return () => clearTimeout(timer)
+  }, [schemeSearchQuery, selectedState, sectorFilter, loadSchemes])
+
+  const handleSendChat = async event => {
+    event?.preventDefault()
+    if (!chatInput.trim() || isAiTyping) return
+    if (await sendChatMessage(chatInput, sectorFilter)) setChatInput('')
   }
 
-  // Filter schemes
   const filteredSchemes = schemes.filter(scheme => {
-    // Tab filter
-    if (activeTab === 'recommended' && !scheme.isRecommended) return false
+    if (schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3) return false
+    if (activeTab === 'recommended' && scheme.evidence_kind !== 'reviewed_paraphrase') return false
     if (activeTab === 'saved' && !savedSchemeIds.includes(scheme.id)) return false
-    // Sector filter
-    if (sectorFilter !== 'All' && scheme.category !== sectorFilter) return false
-    // Search query
-    if (schemeSearchQuery.trim()) {
-      const q = schemeSearchQuery.toLowerCase()
-      const matchTitle = scheme.title.toLowerCase().includes(q)
-      const matchDesc = scheme.description.toLowerCase().includes(q)
-      const matchCat = scheme.category.toLowerCase().includes(q)
-      if (!matchTitle && !matchDesc && !matchCat) return false
-    }
     return true
   })
+  const officialSources = [...new Map(schemes.map(s => [s.sourceUrl, { url: s.sourceUrl, name: s.sourceTitle }])).values()]
 
   const getSchemeIcon = (type) => {
     switch (type) {
@@ -99,7 +94,7 @@ export function SchemeSearch() {
             Discover Government Schemes with AI
           </h1>
           <p className="text-xs text-slate-500">
-            Get personalized scheme recommendations, eligibility analysis, documents and official details.
+            Search reviewed official scheme evidence. Check published conditions; this service does not determine your eligibility.
           </p>
         </div>
       </div>
@@ -119,7 +114,7 @@ export function SchemeSearch() {
                   <span>JanSeva AI Assistant</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 </div>
-                <div className="text-[10px] text-slate-300">Online &bull; Govt. Schemes Expert</div>
+                <div className="text-[10px] text-slate-300">Answers from stored source evidence</div>
               </div>
             </div>
           </div>
@@ -138,7 +133,7 @@ export function SchemeSearch() {
                       : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-sm space-y-2'
                   }`}
                 >
-                  <p>{msg.text}</p>
+                  <p className="whitespace-pre-line">{msg.text}</p>
 
                   {/* Bullet points for scheme recommendations */}
                   {msg.bullets && (
@@ -165,6 +160,7 @@ export function SchemeSearch() {
                         <a
                           key={i}
                           href={c.url}
+                          title={`${c.excerpt} ? reviewed ${new Date(c.reviewed_at).toLocaleDateString()}`}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-[10px] text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md hover:underline font-medium"
@@ -180,6 +176,8 @@ export function SchemeSearch() {
               </div>
             ))}
 
+            {chatMessages.length === 0 && <p className="text-xs text-slate-500">Ask about the reviewed collection. Answers include source links; missing evidence will be stated.</p>}
+            {schemeChatError && <p role="alert" className="text-xs text-rose-700">{schemeChatError} Your question is kept so you can retry.</p>}
             {isAiTyping && (
               <div className="flex items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-200 text-slate-500 text-xs w-28">
                 <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-bounce" />
@@ -194,16 +192,18 @@ export function SchemeSearch() {
           {/* Quick Chat Suggestions */}
           <div className="p-2 bg-white border-t border-slate-100 flex gap-1.5 overflow-x-auto text-[11px]">
             <button
-              onClick={() => sendChatMessage('What documents do I need for PM Kisan?')}
+              disabled={isAiTyping}
+              onClick={() => sendChatMessage('What documents do I need for PM Kisan?', sectorFilter)}
               className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-violet-50 hover:text-violet-700 text-slate-600 whitespace-nowrap"
             >
               PM Kisan docs?
             </button>
             <button
-              onClick={() => sendChatMessage('Tell me about Kisan Credit Card (KCC)')}
+              disabled={isAiTyping}
+              onClick={() => sendChatMessage('What documents are required for Sukanya Samriddhi Yojana?', sectorFilter)}
               className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-violet-50 hover:text-violet-700 text-slate-600 whitespace-nowrap"
             >
-              KCC loan limit?
+              SSY documents?
             </button>
           </div>
 
@@ -212,6 +212,8 @@ export function SchemeSearch() {
             <input
               type="text"
               value={chatInput}
+              minLength={3}
+              maxLength={1000}
               onChange={e => setChatInput(e.target.value)}
               placeholder="Ask a follow-up question..."
               className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-violet-500"
@@ -219,14 +221,15 @@ export function SchemeSearch() {
             <button
               type="button"
               className="p-2 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 transition-colors"
-              title="Voice input simulated"
-              onClick={() => sendChatMessage('Can a tenant farmer apply for KCC?')}
+              title="Voice input is not enabled"
+              disabled
             >
               <Mic size={16} />
             </button>
             <button
               type="submit"
-              disabled={!chatInput.trim()}
+              aria-label="Send question"
+              disabled={chatInput.trim().length < 3 || isAiTyping}
               className="p-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white shadow-sm transition-all"
             >
               <Send size={15} />
@@ -247,7 +250,7 @@ export function SchemeSearch() {
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                Recommended for You ({schemes.filter(s => s.isRecommended).length})
+                Reviewed Sources ({schemes.filter(s => s.evidence_kind === 'reviewed_paraphrase').length})
               </button>
               <button
                 onClick={() => setActiveTab('all')}
@@ -280,16 +283,24 @@ export function SchemeSearch() {
             </div>
 
             <select
+              aria-label="Scheme category"
               value={sectorFilter}
               onChange={e => setSectorFilter(e.target.value)}
               className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 bg-slate-50 focus:outline-none"
             >
               <option value="All">All Sectors</option>
               <option value="Agriculture">Sector: Agriculture</option>
-              <option value="Healthcare">Sector: Healthcare</option>
+              <option value="Education">Sector: Education</option>
+              <option value="Insurance">Sector: Insurance</option>
+              <option value="Savings">Sector: Savings</option>
+              <option value="Employment">Sector: Employment</option>
               <option value="Social Welfare">Sector: Social Welfare</option>
             </select>
 
+            <select aria-label="Scheme state" value={selectedState} onChange={e => setSelectedState(e.target.value)} className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs bg-slate-50">
+              <option value="All">All states</option><option value="Punjab">Punjab + National</option>
+              <option value="Haryana">Haryana + National</option><option value="Uttar Pradesh">Uttar Pradesh + National</option>
+            </select>
             <div className="flex-1 min-w-[140px] relative">
               <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
               <input
@@ -302,6 +313,9 @@ export function SchemeSearch() {
             </div>
           </div>
 
+          {schemesLoading && <p role="status" className="text-xs text-slate-500">Loading schemes from the database?</p>}
+          {schemesError && <p role="alert" className="text-xs text-rose-700">{schemesError} <button onClick={() => loadSchemes({ query: schemeSearchQuery, state: selectedState, category: sectorFilter })} className="underline">Retry search</button></p>}
+          {schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3 && <p className="text-xs text-slate-500">Enter at least three characters to search.</p>}
           {/* Scheme Cards List */}
           <div className="space-y-3.5">
             {filteredSchemes.map(scheme => {
@@ -329,7 +343,7 @@ export function SchemeSearch() {
                           : 'bg-amber-100 text-amber-800'
                       }`}>
                         <CheckCircle2 size={11} />
-                        {scheme.eligibilityStatus === 'POTENTIAL' ? `Likely Eligible ${scheme.matchPercentage}%` : 'Needs Info'}
+                        Published conditions
                       </span>
                       <button
                         onClick={() => toggleSaveScheme(scheme.id)}
@@ -375,7 +389,7 @@ export function SchemeSearch() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-sm transition-all hover:scale-105 active:scale-95"
                     >
-                      <span>Apply Now</span>
+                      <span>Official Source</span>
                       <ExternalLink size={12} />
                     </a>
                   </div>
@@ -383,7 +397,7 @@ export function SchemeSearch() {
               )
             })}
 
-            {filteredSchemes.length === 0 && (
+            {filteredSchemes.length === 0 && !schemesLoading && !schemesError && (
               <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
                 No schemes match the selected filters or search query.
               </div>
@@ -426,7 +440,7 @@ export function SchemeSearch() {
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Eligibility &amp; Documents
               </h4>
-              <span className="text-[10px] text-slate-400 font-medium">3/5 Ready</span>
+              <span className="text-[10px] text-slate-400 font-medium">Not assessed</span>
             </div>
 
             <div className="space-y-2 text-xs">
@@ -455,11 +469,11 @@ export function SchemeSearch() {
               Official Sources
             </h4>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Every scheme decision cites authoritative government directories:
+              Source links for the records returned by the database:
             </p>
 
             <div className="space-y-1.5 pt-1">
-              {OFFICIAL_SOURCES.slice(0, 3).map(source => (
+              {officialSources.slice(0, 3).map(source => (
                 <a
                   key={source.url}
                   href={source.url}

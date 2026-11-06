@@ -1,0 +1,14 @@
+Scheme: Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)
+State: National
+Category: Agriculture
+Source URL: https://www.pib.gov.in/PressReleasePage.aspx?PRID=2191651&lang=2&reg=48
+Reviewed: 2026-11-07
+Evidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.
+
+Income support for eligible landholding farmer families through direct bank transfers.
+
+Eligibility: Landholding farmer families with cultivable land in their names are considered, subject to scheme exclusions. Higher-income exclusions include income-tax payers and specified government employees. The consulted national source is not limited to Punjab; it does not establish any particular person's eligibility.
+
+Verified documents / enrolment records: Aadhaar information and e-KYC; Bank account details including IFSC; Land-ownership records; Self-declaration concerning exclusion criteria
+
+Evidence and limitations: The reviewed PIB backgrounder describes annual support of Rs. 6,000 in three Rs. 2,000 instalments for eligible families. Land details, Aadhaar-seeded bank accounts and completed e-KYC are part of beneficiary verification. The listed records are verified enrolment information, not an exhaustive document checklist. No future instalment date was verified.

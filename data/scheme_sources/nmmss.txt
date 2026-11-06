@@ -1,0 +1,14 @@
+Scheme: National Means-cum-Merit Scholarship Scheme (NMMSS)
+State: National
+Category: Education
+Source URL: https://www.pib.gov.in/newsite/erelcontent.aspx?lang=2&reg=48&relid=294184
+Reviewed: 2026-11-07
+Evidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.
+
+Scholarships to help selected students from economically weaker families continue secondary education.
+
+Eligibility: Selected Class IX students must qualify through the State/UT examination. Covered schools are State Government, government-aided and local-body schools. Parental annual income must not exceed Rs. 3.50 lakh. Class VII marks for the selection test are at least 55%, with a five-percentage-point relaxation for SC/ST students.
+
+Verified documents / enrolment records: Complete document list not verified from this source.
+
+Evidence and limitations: The September 2026 Ministry of Education release describes Rs. 12,000 per year and renewal through Classes X to XII subject to academic performance. The announced 2026-27 student application deadline was September 30, 2026; this date has passed as of review. The dataset does not establish a currently open application window or a complete document checklist.

@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import {
-  SCHEMES_DATA,
   NOTIFICATIONS_DATA,
 } from '../data/mockData'
 import { supabase } from '../lib/supabase'
-import { apiRequest } from '../lib/api'
+import { apiRequest, publicApiRequest } from '../lib/api'
+import { schemeView } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
 
 const AppContext = createContext(null)
@@ -25,8 +25,8 @@ export function AppProvider({ children }) {
   const [selectedState, setSelectedState] = useState('Punjab')
   
   // Schemes state
-  const [schemes, setSchemes] = useState(SCHEMES_DATA)
-  const [savedSchemeIds, setSavedSchemeIds] = useState(['S001', 'S002'])
+  const [schemes, setSchemes] = useState([])
+  const [savedSchemeIds, setSavedSchemeIds] = useState([])
   const [activeSchemeModal, setActiveSchemeModal] = useState(null)
   const [schemeSearchQuery, setSchemeSearchQuery] = useState('')
   const [selectedSectorFilter, setSelectedSectorFilter] = useState('All')
@@ -51,30 +51,12 @@ export function AppProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
   // AI Chat Assistant state (for Scheme Discovery)
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 'm1',
-      sender: 'user',
-      text: 'I am a small farmer. What government schemes can I apply for?',
-      time: '10:24 AM'
-    },
-    {
-      id: 'm2',
-      sender: 'assistant',
-      text: 'Here are the most relevant schemes for you as a small farmer with 2.5 acres of land:',
-      bullets: [
-        'PM Kisan Samman Nidhi — ₹6,000/year direct financial support',
-        'Kisan Credit Card (KCC) — Concessional crop loans up to ₹3 Lakh',
-        'Pradhan Mantri Fasal Bima Yojana (PMFBY) — Crop loss insurance'
-      ],
-      footnote: "I've matched your profile and updated eligibility, benefits and required documents on the right. You can filter or compare them directly.",
-      citations: [
-        { title: 'pmkisan.gov.in', url: 'https://pmkisan.gov.in' },
-        { title: 'agriculture.gov.in', url: 'https://agriculture.gov.in' }
-      ],
-      time: '10:24 AM'
-    }
-  ])
+  const [chatMessages, setChatMessages] = useState([])
+  const [schemesLoading, setSchemesLoading] = useState(false)
+  const [schemesError, setSchemesError] = useState('')
+  const [schemeChatError, setSchemeChatError] = useState('')
+  const schemeChatBusy = useRef(false)
+  const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
 
   // Add toast notification
@@ -98,7 +80,7 @@ export function AppProvider({ children }) {
         addToast('Removed scheme from saved list', 'info')
         return prev.filter(id => id !== schemeId)
       } else {
-        addToast('Scheme saved to your profile!', 'success')
+        addToast('Scheme saved for this browsing session.', 'success')
         return [...prev, schemeId]
       }
     })
@@ -237,88 +219,44 @@ export function AppProvider({ children }) {
 
   const handleRouteAction = () => addToast('Department routing is not available in this phase.', 'info')
 
-  // Send AI Chat Message on Schemes page
-  const sendChatMessage = (userText) => {
-    if (!userText.trim()) return
-
-    const now = new Date()
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-
-    const newMsg = {
-      id: `u-${Date.now()}`,
-      sender: 'user',
-      text: userText,
-      time: timeStr
+  const loadSchemes = useCallback(async ({ query = '', state = '', category = '' } = {}) => {
+    const request = ++schemeRequest.current
+    setSchemesLoading(true)
+    setSchemesError('')
+    try {
+      const params = new URLSearchParams({ limit: '10' })
+      if (query.trim()) params.set('query', query.trim())
+      if (state && state !== 'All') params.set('state', state)
+      if (category && category !== 'All') params.set('category', category)
+      const records = await publicApiRequest(`/schemes?${params}`)
+      if (request === schemeRequest.current) setSchemes(records.map(schemeView))
+    } catch (error) {
+      if (request === schemeRequest.current) { setSchemes([]); setSchemesError(error.message) }
+    } finally {
+      if (request === schemeRequest.current) setSchemesLoading(false)
     }
+  }, [])
 
-    setChatMessages(prev => [...prev, newMsg])
+  const sendChatMessage = async (userText, category = '') => {
+    if (!userText.trim() || schemeChatBusy.current) return false
+    schemeChatBusy.current = true
     setIsAiTyping(true)
-
-    // Simulate realistic AI thought and grounded response
-    setTimeout(() => {
-      let reply = {}
-      const lower = userText.toLowerCase()
-
-      if (lower.includes('document') || lower.includes('aadhaar') || lower.includes('apply')) {
-        reply = {
-          text: 'Here are the essential documents verified against official government guidelines:',
-          bullets: [
-            'Aadhaar Card with linked active mobile number',
-            'Land ownership records (Khasra / Khatauni) certified by local Patwari',
-            'Active bank account with Direct Benefit Transfer (DBT) enabled'
-          ],
-          footnote: 'You can check your document readiness in the Profile sidebar on the right.',
-          citations: [{ title: 'myscheme.gov.in', url: 'https://myscheme.gov.in' }]
-        }
-      } else if (lower.includes('complaint') || lower.includes('water') || lower.includes('road') || lower.includes('street')) {
-        reply = {
-          text: 'For civic issues like road damage, water disruption, or broken streetlights, you can draft an official complaint right away:',
-          bullets: [
-            'Go to Raise Complaint in the sidebar',
-            'Our AI classifies the category and suggests the municipal department automatically',
-            'We provide an official copyable complaint package for your local portal'
-          ],
-          footnote: 'Note: JanSeva provides internal tracking. Official filing is completed by you on the government portal.',
-          citations: [{ title: 'pgportal.gov.in', url: 'https://pgportal.gov.in' }]
-        }
-      } else if (lower.includes('fertilizer') || lower.includes('subsidy') || lower.includes('punjab')) {
-        reply = {
-          text: 'In Punjab, multiple agricultural subsidies and debt relief schemes are active:',
-          bullets: [
-            'Punjab Crop Diversification & Machinery Subsidy (up to 50%)',
-            'Subsidized canal water and electricity for registered farmers',
-            'Punjab Agricultural Debt Relief Scheme for small holdings'
-          ],
-          footnote: 'All Punjab state schemes are filtered and viewable in the central list.',
-          citations: [{ title: 'punjab.gov.in', url: 'https://punjab.gov.in' }]
-        }
-      } else {
-        reply = {
-          text: `Based on your profile as a ${currentUser.occupation} in ${selectedState}:`,
-          bullets: [
-            'PM Kisan Samman Nidhi (Next installment due: ₹2,000)',
-            'Kisan Credit Card (Concessional credit limit up to ₹3 Lakh)',
-            'PM Fasal Bima Yojana (Subsidized premium at 1.5% - 2%)'
-          ],
-          footnote: 'Every recommended scheme links directly to the official government portal.',
-          citations: [
-            { title: 'pmkisan.gov.in', url: 'https://pmkisan.gov.in' },
-            { title: 'agriculture.gov.in', url: 'https://agriculture.gov.in' }
-          ]
-        }
-      }
-
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: `a-${Date.now()}`,
-          sender: 'assistant',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          ...reply
-        }
-      ])
-      setIsAiTyping(false)
-    }, 1100)
+    setSchemeChatError('')
+    const now = Date.now()
+    setChatMessages(prev => [...prev, { id: `u-${now}`, sender: 'user', text: userText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
+    try {
+      const profile = { ...(selectedState !== 'All' ? { state: selectedState } : {}), ...(currentUser.occupation ? { occupation: currentUser.occupation } : {}) }
+      const reply = await publicApiRequest('/schemes/ask', {
+        method: 'POST', body: JSON.stringify({ message: userText, profile,
+          ...(category && category !== 'All' ? { category } : {}) }),
+      })
+      setChatMessages(prev => [...prev, { id: `a-${now}`, sender: 'assistant', text: reply.answer,
+        citations: reply.citations, mode: reply.mode, tool_trace: reply.tool_trace,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
+      return true
+    } catch (error) { setSchemeChatError(error.message); return false }
+    finally { schemeChatBusy.current = false; setIsAiTyping(false) }
   }
 
   // Selecting a persona opens sign-in. Only /api/me establishes its role.
@@ -355,7 +293,7 @@ export function AppProvider({ children }) {
         switchUserRole,
         selectedState,
         setSelectedState,
-        schemes,
+        schemes, schemesLoading, schemesError, schemeChatError, loadSchemes,
         savedSchemeIds,
         toggleSaveScheme,
         activeSchemeModal,
