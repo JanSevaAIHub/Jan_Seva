@@ -1,6 +1,15 @@
-"""Shared Day 1 request/response schemas."""
+"""Validated API boundary models; server-owned identity/status fields are not inputs."""
 
-from pydantic import BaseModel
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+
+from app.models import ComplaintCategory, InternalStatus, Role
+
+
+class APIModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid", str_strip_whitespace=True)
 
 
 class HealthResponse(BaseModel):
@@ -14,4 +23,64 @@ class ErrorDetail(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: ErrorDetail
+
+
+class Profile(APIModel):
+    user_id: UUID
+    name: str = Field(min_length=1, max_length=120)
+    role: Role
+    state: str | None = Field(default=None, max_length=100)
+    occupation: str | None = Field(default=None, max_length=100)
+
+
+class Scheme(APIModel):
+    id: UUID
+    title: str = Field(min_length=1, max_length=250)
+    category: str = Field(min_length=1, max_length=100)
+    state: str | None = Field(default=None, max_length=100)
+    description: str = Field(min_length=1)
+    source_url: HttpUrl
+    rules_json: dict = Field(default_factory=dict)
+    reviewed_at: datetime
+
+
+class ComplaintCreate(APIModel):
+    title: str = Field(min_length=3, max_length=250)
+    description: str = Field(min_length=10, max_length=5000)
+    category: ComplaintCategory
+    locality: str = Field(min_length=2, max_length=250)
+
+
+class ComplaintSummary(APIModel):
+    id: UUID
+    user_id: UUID
+    title: str
+    category: ComplaintCategory
+    locality: str
+    status: InternalStatus
+    assigned_officer_id: UUID | None
+    official_ref: str | None
+    created_at: datetime
+    updated_at: datetime
+    is_synthetic: bool
+
+
+class ComplaintEvent(APIModel):
+    id: UUID
+    complaint_id: UUID
+    actor_id: UUID
+    old_status: InternalStatus | None
+    new_status: InternalStatus
+    note: str
+    event_time: datetime
+
+
+class ComplaintDetail(ComplaintSummary):
+    description: str
+    events: list[ComplaintEvent] = Field(default_factory=list)
+
+
+class ComplaintStatusUpdate(APIModel):
+    status: InternalStatus
+    note: str = Field(min_length=1, max_length=2000)
 

@@ -18,7 +18,7 @@ Requirements: Node.js 20.19+ or 22.12+, Python 3.11+, Git.
 3. API terminal from the repository root: `python -m venv .venv`, `.venv\Scripts\Activate.ps1`, `pip install -r services/api/requirements.txt`, then `uvicorn app.main:app --app-dir services/api --env-file services/api/.env --reload`.
 4. Open `http://127.0.0.1:5173`; API health is at `http://127.0.0.1:8000/api/health` and API docs at `/docs`.
 
-Day 1 provides the navigable visual shell and health endpoint. Scheme search, authentication, complaint workflows, and AI features are added in later implementation phases; the UI does not present placeholder scheme facts or government statistics as real data.
+The frontend currently uses demonstration fixtures and in-memory workflows, including sample scheme facts and statistics. The backend provides `/api/health` and protected `/api/me`, PostgreSQL models, JWT/role/access dependencies, and explicit migration/demo commands. Configure and verify those foundations using [Phase 1 setup](docs/phase-1-setup.md). Complaint CRUD, frontend authentication wiring, retrieval and AI workflows remain later-phase work.
 
 ## Trust boundaries
 

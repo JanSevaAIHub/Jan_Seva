@@ -2,6 +2,10 @@
 
 Base path: `/api`. JSON requests and responses. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
 
+Phase 1 implementation boundary: only `GET /api/health` and `GET /api/me` are registered. Other routes below remain the agreed target, not available endpoints. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Citizen/officer and complaint-scope dependencies are implemented and tested for subsequent business routers; no complaint CRUD is exposed in Phase 1. Internal resource/user IDs are UUIDs; the frontend's `REQ-2025-*` identifiers are demo fixtures, not API IDs.
+
+`ComplaintCreate` accepts only `{title, description, category, locality}`; the future create route must take ownership from `require_citizen`, never an input user ID/status. Response DTOs are `ComplaintSummary`, `ComplaintDetail` (including `events`) and `ComplaintEvent`. `ComplaintStatusUpdate` accepts an internal status and a nonempty note; validating allowed transitions remains the business route's responsibility. Stored official references remain independent from internal status. See [Phase 1 setup](phase-1-setup.md) for actual migration/auth scope and live-verification limits.
+
 ## Routes
 
 | Method | Route | Request | Response |
