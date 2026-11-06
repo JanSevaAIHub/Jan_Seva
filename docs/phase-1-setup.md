@@ -97,12 +97,22 @@ Commands actually executed locally:
 
 - Backend requirements installation and `python -m pip check`: passed, no broken requirements. Only necessary additions: SQLAlchemy, psycopg binary driver and PyJWT crypto support. Existing Starlette/httpx deprecation remains; no unrelated dependency upgrade was made.
 - `python -m compileall -q services/api/app`: passed.
-- `python -m pytest -q` with the venv interpreter: **58 passed, 1 warning in 7.56s** after final code review. Includes the unchanged health test; genuine EC/RSA signatures against a local HTTP JWKS server; missing/malformed/forged/unsigned/expired/wrong-issuer/wrong-audience/missing-claim tests; anonymous/service-role rejection; role/ownership/assignment checks; data persistence, defaults, relationships, required indexes and foreign-key checks; embedding validation; provider-mocked demo provisioning and seed twice; sanitized DB configuration/query failures.
+- `python -m pytest -q` with the venv interpreter: **62 passed, 1 warning in 7.87s**. Includes the unchanged health test; genuine EC/RSA signatures against a local HTTP JWKS server; missing/malformed/forged/unsigned/expired/wrong-issuer/wrong-audience/missing-claim tests; non-finite timestamp rejection; anonymous/service-role rejection; role/ownership/assignment checks; data persistence, defaults, relationships, required indexes and foreign-key checks; embedding validation; provider-mocked demo provisioning and seed twice; sanitized DB configuration/query failures, including invalid connection ports.
 - Live Uvicorn startup: passed with no service configuration. `/api/health` returned 200 and `{"status":"ok"}`; `/api/me` without token returned 401; `/docs` returned 200; `/api/complaints` returned 404; OpenAPI contained exactly health and profile business routes. The audit server was stopped afterward.
 - Live `app.scripts.migrate`: failed closed, `DATABASE_URL is not configured.`
 - Live `app.scripts.check_db`: failed closed for the same reason.
+- Live `app.scripts.setup_demo`: failed closed, `Set a valid DEMO_CITIZEN_EMAIL.`
 - Live `app.scripts.seed_demo`, attempted twice: failed closed, `Set a valid DEMO_CITIZEN_EMAIL.`
 
 SQLite tests create only the five core test tables via SQLAlchemy. They do **not** execute the PostgreSQL SQL file, Supabase `auth.users` FK, PostgreSQL trigger/JSONB constraints or RLS/grant statements. The local JWKS server and Admin API test double are isolated test infrastructure, not real Supabase identities or a runtime auth bypass. No mocked check is presented as a live provider result.
 
-Remaining live blockers: no `DATABASE_URL`, trusted Supabase project/signing keys, admin key, demo emails/passwords or configured embedding model/dimensions. Thus migration SQL execution/rerun, real database connection, provider account creation/login and live seed idempotence are not verified. The user authorized continuing with local tests and reporting these blockers. No fake credentials or user UUIDs were inserted into a live service. Phase 1 implementation stops here; Phase 2 has not started.
+Remaining live blockers: no `DATABASE_URL`, trusted Supabase project/signing keys, admin key or demo emails/passwords. Thus migration SQL execution/rerun, real database connection, provider account creation/login and live seed idempotence are not verified. Model/dimension configuration is needed before storing embeddings. No fake credentials or user UUIDs were inserted into a live service. Phase 1 implementation stops here; Phase 2 has not started.
+
+## Files changed
+
+- Configuration and wiring: `.env.example`, `README.md`, `docs/api-contract.md`, `services/api/requirements.txt`, `services/api/app/config.py`, `services/api/app/main.py`.
+- Foundation under `services/api/app/`: `db.py`, `models.py`, `auth.py`, `schemas.py`, `routers/profiles.py`.
+- Operator commands under `services/api/app/scripts/`: `__init__.py`, `migrate.py`, `check_db.py`, `setup_demo.py`, `seed_demo.py`.
+- Migration and fixtures: `services/api/migrations/001_initial.sql`, `data/seed_complaints.json`.
+- Verification under `services/api/tests/`: `conftest.py`, `test_auth.py`, `test_authorization.py`, `test_db.py`, `test_models_and_seed.py`.
+- Setup and verification report: `docs/phase-1-setup.md`.
