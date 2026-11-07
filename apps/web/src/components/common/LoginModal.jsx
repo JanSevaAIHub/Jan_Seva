@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useDialog } from '../../lib/useDialog'
 
 export function LoginModal() {
   const { loginRole, setLoginRole, signIn, authError, authBusy } = useApp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const dialogRef = useDialog(Boolean(loginRole), () => setLoginRole(null), authBusy)
   const demoEmail = import.meta.env.DEV ? import.meta.env.VITE_DEMO_EMAIL : ''
   const demoPassword = import.meta.env.DEV ? import.meta.env.VITE_DEMO_PASSWORD : ''
   useEffect(() => { setEmail(''); setPassword('') }, [loginRole])
@@ -16,7 +18,7 @@ export function LoginModal() {
   }
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-      <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="login-heading" className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+      <form ref={dialogRef} tabIndex={-1} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="login-heading" className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
         <div className="flex justify-between items-center">
           <h2 id="login-heading" className="font-bold text-slate-900">Sign in — {loginRole === 'officer' ? 'Officer' : 'Citizen'}</h2>
           <button type="button" aria-label="Close sign in" disabled={authBusy} onClick={() => setLoginRole(null)}><X size={18} /></button>

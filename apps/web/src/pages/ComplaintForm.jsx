@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Siren,
@@ -24,6 +24,7 @@ const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6c
 export function ComplaintForm() {
   const navigate = useNavigate()
   const {
+    session,
     activeComplaint,
     complaints,
     setReviewModalComplaint,
@@ -33,6 +34,7 @@ export function ComplaintForm() {
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
   const [createdTicket, setCreatedTicket] = useState(null)
+  useEffect(() => { setCreatedTicket(null) }, [session?.user.id])
   
   // Form fields
   const [title, setTitle] = useState('')
@@ -132,7 +134,7 @@ export function ComplaintForm() {
       </div>
 
       {/* Newly Created Ticket Success Banner */}
-      {createdTicket && (
+      {createdTicket && createdTicket.user_id === session?.user.id && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-start sm:items-center gap-3">
             <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 flex-none mt-0.5 sm:mt-0">

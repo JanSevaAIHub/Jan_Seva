@@ -1,6 +1,8 @@
 """Production HTTP routes, signed JWTs and durable isolated database sessions."""
 
 from uuid import UUID
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 from fastapi.testclient import TestClient
 import pytest
@@ -12,6 +14,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.main import app
 from app.models import Complaint, ComplaintEvent, InternalStatus
+from app.routers import officer
 
 DRAFT = {"title": "[SYNTHETIC] Streetlight test", "description": "Synthetic demonstration only: streetlight needs internal review.",
          "category": "streetlight", "locality": "Synthetic Test Ward"}
@@ -193,3 +196,49 @@ def test_demo_assignment_is_optional_and_misconfiguration_fails_closed(workflow_
         assert response.status_code == 503
         assert response.json()["detail"]["code"] == "ASSIGNMENT_NOT_CONFIGURED"
     assert len(client.get("/api/complaints", headers=headers["citizen"]).json()) == 1
+
+
+def test_concurrent_officer_updates_append_only_one_event(workflow_client, monkeypatch):
+    client, headers, engine = workflow_client
+    saved = create(workflow_client)
+    rendezvous = Barrier(2, timeout=10)
+    original = officer.assigned_officer_complaint
+
+    def read_same_version(*args):
+        complaint = original(*args)
+        rendezvous.wait()
+        return complaint
+
+    monkeypatch.setattr(officer, "assigned_officer_complaint", read_same_version)
+
+    def update(_):
+        return client.patch(f'/api/officer/complaints/{saved["id"]}',
+                            json={"status": "UNDER_REVIEW"}, headers=headers["officer"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(update, range(2)))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    with Session(engine) as db:
+        assert db.get(Complaint, UUID(saved["id"])).status == InternalStatus.UNDER_REVIEW
+        assert db.scalar(select(func.count()).select_from(ComplaintEvent)) == 2
+
+
+def test_repeated_identical_creates_are_distinct_tickets_not_silent_deduplication(workflow_client):
+    first, second = create(workflow_client), create(workflow_client)
+    assert first["id"] != second["id"]
+    assert len(first["events"]) == len(second["events"]) == 1
+
+
+@pytest.mark.parametrize("change", [{"category": "electricity"}, {"locality": " "}, {"description": " "}])
+def test_invalid_complaint_fields_are_rejected_without_saving(workflow_client, change):
+    client, headers, engine = workflow_client
+    response = client.post("/api/complaints", json={**DRAFT, **change}, headers=headers["citizen"])
+    assert response.status_code == 422
+    with Session(engine) as db:
+        assert db.scalar(select(func.count()).select_from(Complaint)) == 0
+
+
+def test_invalid_ticket_uuid_has_sanitized_validation_error(workflow_client):
+    client, headers, _ = workflow_client
+    response = client.get('/api/complaints/not-a-uuid', headers=headers["citizen"])
+    assert response.status_code == 422 and "not-a-uuid" not in response.text

@@ -2,7 +2,7 @@
 
 An independent citizen-assistance portfolio project: discover public schemes with cited evidence, create internal civic complaints, and review their history with an assigned officer. JanSeva does not file government grievances or verify government resolution.
 
-**Release status (2026-11-07): local verification passes; live-provider verification is blocked by missing configuration.** This is a controlled demo candidate, not an approved public production release. See the [release review](docs/release-review.md) and [implementation status](docs/implementation-status.md).
+**Development status (2026-11-08): combined work stabilized locally; hosted integrations remain unverified.** This is a controlled demo candidate, not an approved public production release. See the current [stabilization report](docs/stabilization-report.md), [implementation status](docs/implementation-status.md), and historical [release review](docs/release-review.md).
 
 ## Technology and architecture
 
@@ -122,7 +122,7 @@ Complaints use database UUIDs, authenticated ownership, real timestamps and atom
 
 JWT signatures, issuer, audience, required claims and expiry are validated against trusted JWKS. Roles come from database profiles, never a React role selector. Owner/assignment checks protect complaint reads and updates. Request validation, parameterized SQL, atomic writes, sanitized errors and explicit CORS origins are present. Offline token verification does not provide immediate session revocation.
 
-Public scheme routes have **no rate limiting or billing quotas**: restrict the demo until abuse controls exist. Other limits: no live-provider/deployment verification or CI, Python dependency ranges without a lockfile, configured bundle size advisory, session-only bookmarks, no upload/GPS verification, general homepage AI/voice, notification/translation backend, complaint AI/deduplication or government integration. Mutations have no idempotency keys: a lost response may follow a committed write. Source coverage is small and date-sensitive; inclusion does not guarantee eligibility or current availability. The scoped secret scan is not comprehensive security certification.
+Public AI requests (scheme queries and `/schemes/ask`) share an in-process limit: **10 per client per minute, 30 total per minute, and 2 concurrent requests**. Excess work receives 429 with `Retry-After`; plain stored-scheme listing does not consume this budget. These limits reset on restart and are separate for each worker: shared quotas and billing controls are still required before public deployment. Other limits: no live-provider/deployment verification or CI, Python dependency ranges without a lockfile, configured bundle size advisory, session-only bookmarks, no upload/GPS verification, general homepage AI/voice, notification/translation backend, complaint AI/deduplication or government integration. The UI prevents simultaneous confirmation clicks, but mutations have no server idempotency keys: a lost response may follow a committed write. Source coverage is small and date-sensitive; inclusion does not guarantee eligibility or current availability. The scoped secret scan is not comprehensive security certification. PR #2's inherited demo password must be rotated by its owner if real; it is absent from the current source but remains in preserved history.
 
 ## Measured verification and demo
 
@@ -133,7 +133,7 @@ npm.cmd --prefix apps/web run test:e2e
 npm.cmd --prefix apps/web run build
 ```
 
-Final results: **103 backend passed, 1 live test skipped; 8 client passed; 12 Chromium browser passed; builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. Actual release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
+Stabilization results: **134 backend passed, 1 live test skipped; 11 client passed; 21 Chromium browser passed; default and Auth-configured builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. See the [stabilization report](docs/stabilization-report.md) for fixes, commands and remaining gates. Historical release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
 
 After setup, sign in as Arjun, load schemes, ask a question and open its official citation. Submit a complaint, retain the returned UUID, check My Requests and refresh. In a separate browser profile, sign in as R. Singh, open the assigned UUID and advance its status with a note. Refresh Arjun's tracking page and confirm persistent status/history. Then run the live gate:
 

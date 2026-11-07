@@ -1,4 +1,4 @@
-"""Insert exactly ten labeled synthetic fixtures; never reset real/existing records."""
+"""Insert exactly twenty labeled synthetic fixtures; never reset real/existing records."""
 
 import json
 from pathlib import Path

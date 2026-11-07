@@ -3,7 +3,7 @@
 from pathlib import Path
 import sys
 
-from sqlalchemy import inspect
+from sqlalchemy import String, inspect
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -22,6 +22,12 @@ def validate_schema(connection: Connection) -> None:
         for column in table.columns:
             if column.name not in actual or actual[column.name]["nullable"] != column.nullable:
                 raise ConfigurationError(f"Incompatible existing table: {table.name}.{column.name}; review manually without dropping data.")
+            if isinstance(column.type, String):
+                reflected = actual[column.name]["type"]
+                if (not isinstance(reflected, String) or
+                    (column.type.length is not None and reflected.length is not None
+                     and reflected.length < column.type.length)):
+                    raise ConfigurationError(f"Incompatible column type/width: {table.name}.{column.name}; apply the additive upgrade or review manually.")
         primary = set(inspector.get_pk_constraint(table.name, schema="public")["constrained_columns"])
         if primary != {c.name for c in table.primary_key}:
             raise ConfigurationError(f"Incompatible primary key on {table.name}.")

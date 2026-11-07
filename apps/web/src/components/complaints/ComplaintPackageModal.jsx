@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, Copy, Check, ExternalLink, ShieldCheck, FileCheck, Share2 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useDialog } from '../../lib/useDialog'
 
 export function ComplaintPackageModal() {
   const { packageModalComplaint, setPackageModalComplaint, addToast, saveOfficialReference, currentUser } = useApp()
@@ -9,6 +10,7 @@ export function ComplaintPackageModal() {
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useDialog(Boolean(packageModalComplaint), () => setPackageModalComplaint(null), saving)
   useEffect(() => {
     setOfficialRefInput(packageModalComplaint?.officialRef || '')
     setCopied(false)
@@ -64,6 +66,8 @@ OFFICIAL FILING CHANNELS:
       <div 
         className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
       >
         {/* Header */}
@@ -78,6 +82,7 @@ OFFICIAL FILING CHANNELS:
             </div>
           </div>
           <button
+            aria-label="Close complaint package"
             onClick={() => setPackageModalComplaint(null)}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
           >

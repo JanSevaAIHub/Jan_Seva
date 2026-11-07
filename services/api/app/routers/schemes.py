@@ -1,10 +1,11 @@
 """Public, read-only scheme discovery from the real database and pgvector."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.corpus import official_url
+from app.ai.budget import ModelBudget
 from app.ai.provider import ProviderError
 from app.ai.rag import answer_question
 from app.ai.retrieval import retrieve
@@ -14,6 +15,17 @@ from app.db import get_db
 from app.models import Scheme
 
 router = APIRouter(prefix="/schemes", tags=["schemes"])
+model_budget = ModelBudget()
+
+
+def model_request_budget(request: Request):
+    # Plain stored-record listing incurs no model usage and remains available.
+    if request.method == "GET" and "query" not in request.query_params:
+        yield
+        return
+    client = request.client.host if request.client else "unknown"
+    with model_budget.reserve(client):
+        yield
 
 
 def card(scheme: Scheme) -> SchemeCard:
@@ -33,7 +45,7 @@ def unavailable(error):
     return HTTPException(503, detail={"code": "MODEL_UNAVAILABLE", "message": "The embedding service is temporarily unavailable. Please retry."})
 
 
-@router.get("", response_model=list[SchemeCard])
+@router.get("", response_model=list[SchemeCard], dependencies=[Depends(model_request_budget)])
 def list_schemes(query: str | None = Query(default=None, min_length=3, max_length=1000),
                   state: str | None = Query(default=None, min_length=2, max_length=100),
                   category: str | None = Query(default=None, min_length=2, max_length=100),
@@ -56,7 +68,7 @@ def list_schemes(query: str | None = Query(default=None, min_length=3, max_lengt
     return [card(s) for s in db.scalars(result) if official_url(s.source_url)]
 
 
-@router.post("/ask", response_model=SchemeAnswer)
+@router.post("/ask", response_model=SchemeAnswer, dependencies=[Depends(model_request_budget)])
 def ask_scheme(request: SchemeAsk, db: Session = Depends(get_db)):
     try:
         return answer_question(db, request)

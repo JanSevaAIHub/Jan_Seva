@@ -37,12 +37,14 @@ export function SchemeSearch() {
     sendChatMessage,
     isAiTyping,
     currentUser,
+    session,
     selectedState, setSelectedState
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('all') // 'recommended' | 'all' | 'saved'
   const [sectorFilter, setSectorFilter] = useState('All')
   const [chatInput, setChatInput] = useState('')
+  useEffect(() => { setChatInput('') }, [session?.user.id])
   const chatBottomRef = useRef(null)
 
   // Scroll chat to bottom when message arrives

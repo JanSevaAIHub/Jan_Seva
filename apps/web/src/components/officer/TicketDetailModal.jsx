@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, UserCheck } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { NEXT_STATUS } from '../../lib/complaints'
+import { useDialog } from '../../lib/useDialog'
 
 export function TicketDetailModal() {
   const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus } = useApp()
@@ -10,6 +11,7 @@ export function TicketDetailModal() {
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useDialog(Boolean(officerTicketModal), () => setOfficerTicketModal(null), saving)
   useEffect(() => {
     setSelectedStatus(NEXT_STATUS[officerTicketModal?.status] || '')
     setNote('')
@@ -32,6 +34,8 @@ export function TicketDetailModal() {
       <div 
         className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
       >
         {/* Header */}
@@ -46,6 +50,7 @@ export function TicketDetailModal() {
             </div>
           </div>
           <button
+            aria-label="Close officer review"
             onClick={() => setOfficerTicketModal(null)}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
           >

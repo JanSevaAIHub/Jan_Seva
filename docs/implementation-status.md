@@ -1,4 +1,15 @@
-# Implementation status - Phase 5
+# Implementation status - stabilized combined branch
+
+Reviewed 2026-11-08. Current baseline: `feature/combined-work`; **CONDITIONALLY READY** for local feature development. The [stabilization report](stabilization-report.md) supersedes the historical Phase 5 measurements below.
+
+- 134 backend tests passed, 1 live test skipped; 11 frontend unit tests and 21 Chromium browser tests passed. Default and Auth-configured production builds pass.
+- Reproduced state races, account-data retention, duplicate confirmation, malformed provider parsing, citation validation, schema-width verification, officer-note selection and modal keyboard bugs are fixed and covered.
+- First-login citizen provisioning and twenty synthetic fixtures from PR #2 remain implemented. Both original PR histories remain preserved.
+- Public AI has bounded per-process request/concurrency limits. Shared quotas and billing limits remain a deployment gate.
+- Hosted Supabase, PostgreSQL migrations/RLS/pgvector and OpenAI are unverified; the available backend configuration lacks required values. Browser Auth/AI doubles are not live-provider evidence.
+- A hardcoded demo password remains in inherited PR #2 history; the current source no longer embeds it. Rotate it if real. No secrets are reproduced here.
+
+## Historical Phase 5 assessment
 
 Reviewed 2026-11-07. VERIFIED describes the stated local check, not live-provider readiness. PARTIAL means implemented with an unresolved gate. BLOCKED means external execution could not run. The original assessment is preserved in [Phase 0 audit](phase-0-audit.md).
 

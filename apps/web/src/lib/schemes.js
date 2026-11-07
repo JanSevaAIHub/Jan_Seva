@@ -31,6 +31,10 @@ export function schemeAnswer(reply) {
     !['grounded_extracts', 'extractive_fallback', 'insufficient_evidence'].includes(reply.mode)) {
     throw new Error('The scheme service returned an invalid answer. Please retry.')
   }
-  return { ...reply, citations: reply.citations.filter(c => c && typeof c.title === 'string' && typeof c.excerpt === 'string' &&
-    officialSourceUrl(c.url) && Number.isFinite(Date.parse(c.reviewed_at))) }
+  const valid = reply.citations.every(c => c && typeof c.title === 'string' && typeof c.excerpt === 'string' &&
+    officialSourceUrl(c.url) && Number.isFinite(Date.parse(c.reviewed_at)))
+  if (!valid || (reply.mode !== 'insufficient_evidence' && reply.citations.length === 0)) {
+    throw new Error('The scheme service returned an invalid answer. Please retry.')
+  }
+  return reply
 }

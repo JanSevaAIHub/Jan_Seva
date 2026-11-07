@@ -1,8 +1,10 @@
 import { X, ExternalLink, Bookmark, CheckCircle2, AlertCircle, FileText, ShieldCheck, Calendar } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useDialog } from '../../lib/useDialog'
 
 export function SchemeDetailModal() {
   const { activeSchemeModal, setActiveSchemeModal, savedSchemeIds, toggleSaveScheme } = useApp()
+  const dialogRef = useDialog(Boolean(activeSchemeModal), () => setActiveSchemeModal(null))
 
   if (!activeSchemeModal) return null
 
@@ -13,6 +15,8 @@ export function SchemeDetailModal() {
       <div 
         className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
       >
         {/* Header */}
@@ -36,6 +40,7 @@ export function SchemeDetailModal() {
               <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
             </button>
             <button
+              aria-label="Close scheme details"
               onClick={() => setActiveSchemeModal(null)}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
