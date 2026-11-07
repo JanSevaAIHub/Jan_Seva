@@ -6,6 +6,7 @@ import { SchemeDetailModal } from '../schemes/SchemeDetailModal'
 import { ComplaintReviewModal } from '../complaints/ComplaintReviewModal'
 import { ComplaintPackageModal } from '../complaints/ComplaintPackageModal'
 import { TicketDetailModal } from '../officer/TicketDetailModal'
+import { LoginModal } from '../common/LoginModal'
 
 export function AppShell() {
   return (
@@ -24,6 +25,7 @@ export function AppShell() {
       <ComplaintReviewModal />
       <ComplaintPackageModal />
       <TicketDetailModal />
+      <LoginModal />
     </div>
   )
 }

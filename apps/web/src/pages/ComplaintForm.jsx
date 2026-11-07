@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
 
@@ -31,17 +32,16 @@ export function ComplaintForm() {
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
+  const [createdTicket, setCreatedTicket] = useState(null)
   
   // Form fields
-  const [title, setTitle] = useState('Streetlight not working near City Park')
+  const [title, setTitle] = useState('')
   const [category, setCategory] = useState('Streetlight & Public Lighting')
-  const [description, setDescription] = useState(
-    'The streetlight on Ward 12, near City Park main gate, has not been working for the last 5 days, causing severe safety issues at night.'
-  )
-  const [locality, setLocality] = useState('City Park, Ward 12, Civil Lines, Lucknow, UP')
+  const [description, setDescription] = useState('')
+  const [locality, setLocality] = useState('')
   const [priority, setPriority] = useState('Medium')
-  const [hasPhoto, setHasPhoto] = useState(true)
-  const [aiDetected, setAiDetected] = useState(true)
+  const [hasPhoto, setHasPhoto] = useState(false)
+  const [aiDetected, setAiDetected] = useState(false)
 
   // Auto-detect category from title typing
   const handleTitleChange = (val) => {
@@ -79,12 +79,21 @@ export function ComplaintForm() {
       department: category === 'Streetlight & Public Lighting' ? 'Urban Infrastructure Dept' :
                   category === 'Roads & Potholes' ? 'Roads & Transport Dept' :
                   category === 'Sanitation & Garbage' ? 'Sanitation Dept' : 'Water Supply Dept',
-      evidenceCount: hasPhoto ? 1 : 0
+      evidenceCount: 0,
+      onSuccess: (savedTicket) => {
+        setCreatedTicket(savedTicket)
+        setTitle('')
+        setDescription('')
+        setLocality('')
+        setHasPhoto(false)
+        setAiDetected(false)
+      }
     })
   }
 
   return (
     <div className="space-y-4">
+      <ComplaintFeedback />
       {/* Breadcrumb & Title */}
       <div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
@@ -98,7 +107,7 @@ export function ComplaintForm() {
               Raise a Civic Grievance
             </h1>
             <p className="text-xs text-slate-500">
-              Report local municipal issues, attach photo evidence, verify approximate location, and track resolution.
+              Report local municipal issues and track internal review. Government filing remains a separate manual step.
             </p>
           </div>
 
@@ -122,6 +131,64 @@ export function ComplaintForm() {
         </div>
       </div>
 
+      {/* Newly Created Ticket Success Banner */}
+      {createdTicket && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 flex-none mt-0.5 sm:mt-0">
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-emerald-950 flex items-center gap-2">
+                <span>Internal Ticket Successfully Saved!</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-900">
+                  {createdTicket.status}
+                </span>
+              </div>
+              <div className="text-xs text-emerald-800 flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="font-medium text-emerald-700">Tracking ID:</span>
+                <code className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-900 text-xs">
+                  {createdTicket.id}
+                </code>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(createdTicket.id)
+                addToast('Tracking ID copied to clipboard!', 'success')
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-semibold hover:bg-emerald-100/50 shadow-sm transition-all"
+            >
+              Copy ID
+            </button>
+            <Link
+              to={`/track?id=${encodeURIComponent(createdTicket.id)}`}
+              className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition-all"
+            >
+              Track Status &rarr;
+            </Link>
+            <button
+              type="button"
+              onClick={() => setPackageModalComplaint(createdTicket)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-all"
+            >
+              View Package
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreatedTicket(null)}
+              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded-lg"
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Form Left (7 Cols) + Tracker Right (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left: Interactive Complaint Form */}
@@ -134,7 +201,7 @@ export function ComplaintForm() {
               </label>
               <button
                 type="button"
-                onClick={() => handleTitleChange('Overflowing sewer pipe on Ward 8')}
+                onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false) }}
                 className="text-[10px] text-violet-600 hover:underline"
               >
                 Load sample
@@ -143,6 +210,8 @@ export function ComplaintForm() {
             <input
               type="text"
               required
+              minLength={3}
+              maxLength={250}
               value={title}
               onChange={e => handleTitleChange(e.target.value)}
               placeholder="e.g. Streetlight not working near City Park"
@@ -159,7 +228,7 @@ export function ComplaintForm() {
               {aiDetected && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
                   <Sparkles size={11} className="text-violet-600" />
-                  AI Suggested Category (Editable)
+                  Keyword suggestion (editable)
                 </span>
               )}
             </div>
@@ -190,6 +259,7 @@ export function ComplaintForm() {
             </div>
             <textarea
               rows={4}
+              minLength={10}
               required
               maxLength={500}
               value={description}
@@ -208,10 +278,10 @@ export function ComplaintForm() {
               </span>
               <button
                 type="button"
-                onClick={() => addToast('Location auto-pinned using GPS simulation', 'info')}
+                onClick={() => addToast('Map preview only. Enter your locality below; GPS is not connected.', 'info')}
                 className="text-[10px] font-semibold text-violet-600 hover:underline"
               >
-                Edit Pin
+                Map preview only
               </button>
             </div>
 
@@ -230,7 +300,12 @@ export function ComplaintForm() {
 
             <input
               type="text"
+              aria-label="Locality"
+              placeholder="Enter locality or landmark"
               value={locality}
+              required
+              minLength={2}
+              maxLength={250}
               onChange={e => setLocality(e.target.value)}
               className="w-full text-xs bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 focus:outline-none"
             />
@@ -243,9 +318,9 @@ export function ComplaintForm() {
             </label>
             <div className="grid grid-cols-3 gap-2.5">
               {[
-                { label: 'Low', time: '> 7 days', tone: 'text-slate-700' },
-                { label: 'Medium', time: '3-5 days', tone: 'text-violet-700' },
-                { label: 'High', time: '< 24 hrs', tone: 'text-rose-600' }
+                { label: 'Low', time: 'Preview only', tone: 'text-slate-700' },
+                { label: 'Medium', time: 'Preview only', tone: 'text-violet-700' },
+                { label: 'High', time: 'Preview only', tone: 'text-rose-600' }
               ].map(p => (
                 <button
                   key={p.label}
@@ -264,6 +339,7 @@ export function ComplaintForm() {
             </div>
           </div>
 
+          <p className="text-[11px] text-slate-500">Priority and response-time estimates are not assessed or saved in this phase.</p>
           {/* Upload Evidence */}
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
@@ -281,7 +357,7 @@ export function ComplaintForm() {
                     type="button"
                     onClick={() => {
                       setHasPhoto(false)
-                      addToast('Removed photo evidence', 'info')
+                      addToast('Sample preview hidden. No attachment was uploaded.', 'info')
                     }}
                     className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
                   >
@@ -293,18 +369,18 @@ export function ComplaintForm() {
                   type="button"
                   onClick={() => {
                     setHasPhoto(true)
-                    addToast('Photo uploaded successfully', 'success')
+                    addToast('Sample preview only; attachments are not uploaded in this phase.', 'info')
                   }}
                   className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 hover:border-violet-400 flex flex-col items-center justify-center text-slate-400 hover:text-violet-600 transition-colors"
                 >
                   <Upload size={18} />
-                  <span className="text-[9px] font-bold mt-1">Upload</span>
+                  <span className="text-[9px] font-bold mt-1">Preview</span>
                 </button>
               )}
 
               <div className="text-xs text-slate-500 leading-relaxed">
-                <div>Attach photos or receipts (PNG, JPG up to 10 MB).</div>
-                <div className="text-[11px] text-slate-400">Geotags will be preserved to aid municipal triage.</div>
+                <div>Sample preview only; attachments are not saved.</div>
+                <div className="text-[11px] text-slate-400">Location is stored as the locality text you enter.</div>
               </div>
             </div>
           </div>
@@ -313,15 +389,17 @@ export function ComplaintForm() {
           <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
             <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
             <div className="text-xs text-indigo-950 leading-relaxed">
-              <strong>Similar Complaints (AI Suggestion):</strong> Streetlight not working near Ward 12 &bull; 3 similar cases &bull; Last resolved in 2 days.
+              <strong>Similar Complaints:</strong> Duplicate detection is not enabled in this phase.
             </div>
           </div>
 
+          <p className="text-[11px] text-slate-500">Draft storage is unavailable. Your values stay in this form for review or retry; refreshing clears unsaved values.</p>
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => addToast('Complaint draft saved locally', 'info')}
+              disabled
+              title="Draft storage is unavailable; form values remain while you review or retry."
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50"
             >
               Save as Draft
@@ -350,7 +428,7 @@ export function ComplaintForm() {
 
             {/* Ticket Card Details */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-              <div className="text-xs font-bold text-violet-700">{activeComplaint?.id}</div>
+              <div className="text-xs font-bold text-violet-700 break-all">{activeComplaint?.id}</div>
               <div className="text-xs font-semibold text-slate-800">{activeComplaint?.title}</div>
               <div className="text-[11px] text-slate-500">{activeComplaint?.locality}</div>
             </div>
@@ -394,6 +472,7 @@ export function ComplaintForm() {
             <div className="pt-3 border-t border-slate-100">
               <button
                 type="button"
+                disabled={!activeComplaint}
                 onClick={() => setPackageModalComplaint(activeComplaint)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-all"
               >
@@ -410,7 +489,7 @@ export function ComplaintForm() {
               Official Government Filing Boundary
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              JanSeva AI is an internal citizen triage assistant. Government departments (CPGRAMS / Municipal Corporations) do not accept third-party automated API filings. Always copy your complaint package and submit it on the official verified channel.
+              JanSeva tracks internal review only. To file a government grievance, copy your complaint package and submit it yourself on the appropriate official channel. Internal resolution does not confirm government resolution.
             </p>
           </div>
         </div>

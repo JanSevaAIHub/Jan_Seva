@@ -1,0 +1,78 @@
+import { test, expect } from '@playwright/test'
+import { login } from './helpers/auth.js'
+
+test.beforeEach(async ({ page }) => {
+  // External decorative images do not participate in complaint persistence.
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
+})
+
+test('citizen submits, officer updates, citizen returns and refresh retains ticket and audit', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/complaints/new')
+  await expect(page.getByText('Sign in to create and view your complaints.')).toBeVisible()
+  await login(page, 'citizen')
+  await page.getByPlaceholder('e.g. Streetlight not working near City Park').fill('[SYNTHETIC] Browser journey streetlight')
+  await page.getByPlaceholder('Describe what happened, exact location landmark, and when it started...').fill('Synthetic demonstration only: browser workflow streetlight complaint.')
+  await page.getByLabel('Locality', { exact: true }).fill('[SYNTHETIC] Browser Test Ward')
+  await page.getByRole('button', { name: 'Submit Complaint', exact: true }).click()
+  const review = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Review Before Submission' }) })
+  // Simulated network failure must leave the review and original draft intact.
+  await page.route('**/api/complaints', async route => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: { message: 'Synthetic temporary failure' } }) })
+      await page.unroute('**/api/complaints')
+    } else await route.continue()
+  })
+  await review.getByRole('button', { name: 'Confirm & Create Ticket' }).click()
+  await expect(review.getByRole('alert')).toHaveText('Synthetic temporary failure')
+  await expect(review.getByText('[SYNTHETIC] Browser journey streetlight', { exact: true })).toBeVisible()
+  const savedResponse = page.waitForResponse(r => r.url().endsWith('/api/complaints') && r.request().method() === 'POST' && r.status() === 201)
+  await review.getByRole('button', { name: 'Confirm & Create Ticket' }).click()
+  const saved = await (await savedResponse).json()
+  expect(saved.status).toBe('LOCAL_SUBMITTED')
+  expect(saved.official_status).toBe('NOT_FILED')
+  expect(saved.assigned_officer_id).toBeTruthy()
+  await expect(review).toBeHidden()
+  await page.goto('/requests')
+  await expect(page.getByText(saved.id, { exact: true }).first()).toBeVisible()
+  await page.getByRole('link', { name: 'View details & audit history' }).first().click()
+  await expect(page.getByText('Citizen created an internal JanSeva ticket;', { exact: false })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(saved.id, { exact: true }).first()).toBeVisible()
+  await login(page, 'officer')
+  await page.goto('/officer')
+  const row = page.getByRole('row').filter({ hasText: saved.id })
+  await expect(row).toBeVisible()
+  await row.getByRole('button', { name: 'Audit / Review' }).click()
+  const audit = page.getByRole('dialog')
+  await audit.getByRole('combobox').selectOption('UNDER_REVIEW')
+  await audit.getByRole('textbox').fill('Synthetic officer review from the browser test.')
+  await audit.getByRole('button', { name: 'Apply Status Update' }).click()
+  await expect(audit.getByText('UNDER_REVIEW', { exact: true }).first()).toBeVisible()
+  await expect(audit.getByText('Synthetic officer review from the browser test.', { exact: false })).toBeVisible()
+  await audit.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await login(page, 'citizen')
+  await page.goto(`/track?id=${saved.id}`)
+  await expect(page.getByText('UNDER REVIEW', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Synthetic officer review from the browser test.', { exact: false }).last()).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(saved.id, { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Synthetic officer review from the browser test.', { exact: false }).last()).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('guest and citizen cannot acquire an officer queue through the role UI', async ({ page }) => {
+  let authorization
+  page.on('request', request => { if (request.url().endsWith('/api/me')) authorization = request.headers().authorization })
+  await page.goto('/officer')
+  await expect(page.getByText('A verified officer account is required')).toBeVisible()
+  await expect(page.getByRole('table')).toHaveCount(0)
+  await login(page, 'citizen')
+  const forbidden = await page.request.patch('http://127.0.0.1:8765/api/officer/complaints/00000000-0000-0000-0000-000000000000', { headers: { Authorization: authorization }, data: { status: 'UNDER_REVIEW' } })
+  expect(forbidden.status()).toBe(403)
+  const anonymous = await page.request.post('http://127.0.0.1:8765/api/complaints', { data: {} })
+  expect(anonymous.status()).toBe(401)
+  await expect(page.getByText('A verified officer account is required')).toBeVisible()
+  await expect(page.getByRole('table')).toHaveCount(0)
+})

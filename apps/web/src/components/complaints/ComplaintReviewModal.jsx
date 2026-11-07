@@ -2,13 +2,18 @@ import { X, ShieldAlert, ArrowRight, CheckCircle2, Building, MapPin, Tag } from 
 import { useApp } from '../../context/AppContext'
 
 export function ComplaintReviewModal() {
-  const { reviewModalComplaint, setReviewModalComplaint, addComplaint } = useApp()
+  const { reviewModalComplaint, setReviewModalComplaint, addComplaint, complaintSaving, complaintSaveError, session, switchUserRole } = useApp()
 
   if (!reviewModalComplaint) return null
 
-  const handleConfirm = () => {
-    addComplaint(reviewModalComplaint)
-    setReviewModalComplaint(null)
+  const handleConfirm = async () => {
+    const ticket = await addComplaint(reviewModalComplaint)
+    if (ticket) {
+      if (typeof reviewModalComplaint.onSuccess === 'function') {
+        reviewModalComplaint.onSuccess(ticket)
+      }
+      setReviewModalComplaint(null)
+    }
   }
 
   return (
@@ -36,6 +41,8 @@ export function ComplaintReviewModal() {
 
         {/* Body */}
         <div className="p-6 space-y-4">
+          {complaintSaveError && <p role="alert" className="text-xs text-rose-700">{complaintSaveError}</p>}
+          {!session && <button onClick={() => switchUserRole('citizen')} className="text-xs text-violet-700 font-bold">Sign in to create this ticket. Your draft is kept.</button>}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
             <div>
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Issue Title</div>
@@ -93,9 +100,10 @@ export function ComplaintReviewModal() {
           </button>
           <button
             onClick={handleConfirm}
+            disabled={complaintSaving || !session}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-md shadow-violet-600/20 transition-all hover:scale-[1.02]"
           >
-            Confirm &amp; Create Ticket <ArrowRight size={14} />
+            {complaintSaving ? 'Saving?' : 'Confirm & Create Ticket'} <ArrowRight size={14} />
           </button>
         </div>
       </div>

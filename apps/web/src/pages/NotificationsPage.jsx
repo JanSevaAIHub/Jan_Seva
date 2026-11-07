@@ -37,12 +37,13 @@ export function NotificationsPage() {
             Notifications &amp; Activity Updates
           </h1>
           <p className="text-xs text-slate-500">
-            Real-time status updates on your grievances, newly matched public schemes, and document actions.
+            Notifications are not connected. Open My Requests for saved ticket statuses and audit history.
           </p>
         </div>
 
         <button
           type="button"
+          disabled={notifications.length === 0}
           onClick={() => {
             markNotificationsRead()
             addToast('All notifications marked as read', 'info')
@@ -136,8 +137,8 @@ export function NotificationsPage() {
         {filtered.length === 0 && (
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs space-y-2">
             <Bell size={28} className="mx-auto text-slate-300" />
-            <div className="font-bold text-slate-700">No unread notifications</div>
-            <p className="text-slate-400">You are completely up to date.</p>
+            <div className="font-bold text-slate-700">Notifications are unavailable</div>
+            <Link to="/requests" className="text-violet-700 underline">View My Requests and audit history</Link>
           </div>
         )}
       </div>
