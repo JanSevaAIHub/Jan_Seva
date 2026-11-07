@@ -29,8 +29,8 @@ def seed_complaints(session: Session, citizen_id: UUID, officer_id: UUID) -> tup
         session.execute(text("SELECT pg_advisory_xact_lock(hashtext('janseva:phase1-demo-seed'))"))
     fixtures = json.loads(FIXTURES.read_text(encoding="utf-8"))
     keys = [row["seed_key"] for row in fixtures]
-    if len(fixtures) != 10 or len(set(keys)) != 10 or any(not key.startswith("phase1-demo-") for key in keys):
-        raise ConfigurationError("Expected exactly ten distinct Phase 1 synthetic fixtures.")
+    if len(fixtures) != 20 or len(set(keys)) != 20 or any(not key.startswith("phase1-demo-") for key in keys):
+        raise ConfigurationError("Expected exactly twenty distinct Phase 1 synthetic fixtures.")
     inserted = 0
     for row in fixtures:
         draft = ComplaintCreate.model_validate({key: row[key] for key in ("title", "description", "category", "locality")})
@@ -58,8 +58,8 @@ def seed_complaints(session: Session, citizen_id: UUID, officer_id: UUID) -> tup
         inserted += 1
     session.flush()
     count = session.scalar(select(func.count()).select_from(Complaint).where(Complaint.seed_key.in_(keys)))
-    if count != 10:
-        raise ConfigurationError("Synthetic fixture count is not ten; transaction must be rolled back.")
+    if count != 20:
+        raise ConfigurationError("Synthetic fixture count is not twenty; transaction must be rolled back.")
     return inserted, count
 
 

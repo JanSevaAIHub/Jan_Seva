@@ -8,7 +8,12 @@ export function ComplaintReviewModal() {
 
   const handleConfirm = async () => {
     const ticket = await addComplaint(reviewModalComplaint)
-    if (ticket) setReviewModalComplaint(null)
+    if (ticket) {
+      if (typeof reviewModalComplaint.onSuccess === 'function') {
+        reviewModalComplaint.onSuccess(ticket)
+      }
+      setReviewModalComplaint(null)
+    }
   }
 
   return (

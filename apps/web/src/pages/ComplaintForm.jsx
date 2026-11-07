@@ -32,6 +32,7 @@ export function ComplaintForm() {
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
+  const [createdTicket, setCreatedTicket] = useState(null)
   
   // Form fields
   const [title, setTitle] = useState('')
@@ -78,7 +79,15 @@ export function ComplaintForm() {
       department: category === 'Streetlight & Public Lighting' ? 'Urban Infrastructure Dept' :
                   category === 'Roads & Potholes' ? 'Roads & Transport Dept' :
                   category === 'Sanitation & Garbage' ? 'Sanitation Dept' : 'Water Supply Dept',
-      evidenceCount: 0
+      evidenceCount: 0,
+      onSuccess: (savedTicket) => {
+        setCreatedTicket(savedTicket)
+        setTitle('')
+        setDescription('')
+        setLocality('')
+        setHasPhoto(false)
+        setAiDetected(false)
+      }
     })
   }
 
@@ -121,6 +130,64 @@ export function ComplaintForm() {
           </div>
         </div>
       </div>
+
+      {/* Newly Created Ticket Success Banner */}
+      {createdTicket && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 flex-none mt-0.5 sm:mt-0">
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-emerald-950 flex items-center gap-2">
+                <span>Internal Ticket Successfully Saved!</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-900">
+                  {createdTicket.status}
+                </span>
+              </div>
+              <div className="text-xs text-emerald-800 flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="font-medium text-emerald-700">Tracking ID:</span>
+                <code className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-900 text-xs">
+                  {createdTicket.id}
+                </code>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(createdTicket.id)
+                addToast('Tracking ID copied to clipboard!', 'success')
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-semibold hover:bg-emerald-100/50 shadow-sm transition-all"
+            >
+              Copy ID
+            </button>
+            <Link
+              to={`/track?id=${encodeURIComponent(createdTicket.id)}`}
+              className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition-all"
+            >
+              Track Status &rarr;
+            </Link>
+            <button
+              type="button"
+              onClick={() => setPackageModalComplaint(createdTicket)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-all"
+            >
+              View Package
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreatedTicket(null)}
+              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded-lg"
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Form Left (7 Cols) + Tracker Right (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

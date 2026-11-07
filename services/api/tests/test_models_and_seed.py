@@ -125,20 +125,20 @@ def test_demo_provider_setup_and_seed_twice_reuses_actual_mock_provider_ids(db_s
         identities = resolve_identities(client, accounts, create=True)
         provision_profiles(db_session, accounts, identities)
         db_session.commit()
-        assert seed_complaints(db_session, identities[Role.CITIZEN], identities[Role.OFFICER]) == (10, 10)
+        assert seed_complaints(db_session, identities[Role.CITIZEN], identities[Role.OFFICER]) == (20, 20)
         db_session.commit()
         first_ids = set(db_session.scalars(select(Complaint.id)))
         first_events = db_session.scalar(select(func.count()).select_from(ComplaintEvent))
         again = resolve_identities(client, accounts, create=True)
         provision_profiles(db_session, accounts, again)
-        assert seed_complaints(db_session, again[Role.CITIZEN], again[Role.OFFICER]) == (0, 10)
+        assert seed_complaints(db_session, again[Role.CITIZEN], again[Role.OFFICER]) == (0, 20)
         db_session.commit()
     assert len(creation_requests) == 2
     assert all("role" not in payload["user_metadata"] for payload in creation_requests)
     assert again == identities
     assert set(db_session.scalars(select(Complaint.id))) == first_ids
     assert db_session.scalar(select(func.count()).select_from(ComplaintEvent)) == first_events
-    assert db_session.scalar(select(func.count()).select_from(Complaint)) == 10
+    assert db_session.scalar(select(func.count()).select_from(Complaint)) == 20
     assert db_session.scalar(select(func.count()).select_from(Profile)) == 2
     assert all(c.is_synthetic and c.title.startswith("[SYNTHETIC]") and c.official_ref is None for c in db_session.scalars(select(Complaint)))
     assert all(c.user_id == identities[Role.CITIZEN] and c.assigned_officer_id == identities[Role.OFFICER] for c in db_session.scalars(select(Complaint)))
@@ -151,7 +151,7 @@ def test_seed_does_not_reset_modified_synthetic_records(db_session, profiles):
     record = db_session.scalar(select(Complaint).where(Complaint.seed_key == "phase1-demo-01"))
     record.status = InternalStatus.CANCELLED
     db_session.commit()
-    assert seed_complaints(db_session, citizen, officer) == (0, 10)
+    assert seed_complaints(db_session, citizen, officer) == (0, 20)
     assert record.status == InternalStatus.CANCELLED
     record.is_synthetic = False
     db_session.flush()
