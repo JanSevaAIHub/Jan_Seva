@@ -156,9 +156,13 @@ export function ComplaintForm() {
           <div className="flex items-center gap-2 flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
             <button
               type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(createdTicket.id)
-                addToast('Tracking ID copied to clipboard!', 'success')
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(createdTicket.id)
+                  addToast('Tracking ID copied to clipboard!', 'success')
+                } catch {
+                  addToast('Could not copy. Select the tracking ID and copy it manually.', 'warning')
+                }
               }}
               className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-semibold hover:bg-emerald-100/50 shadow-sm transition-all"
             >

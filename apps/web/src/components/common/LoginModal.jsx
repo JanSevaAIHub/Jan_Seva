@@ -6,6 +6,8 @@ export function LoginModal() {
   const { loginRole, setLoginRole, signIn, authError, authBusy } = useApp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const demoEmail = import.meta.env.DEV ? import.meta.env.VITE_DEMO_EMAIL : ''
+  const demoPassword = import.meta.env.DEV ? import.meta.env.VITE_DEMO_PASSWORD : ''
   useEffect(() => { setEmail(''); setPassword('') }, [loginRole])
   if (!loginRole) return null
   const submit = async event => {
@@ -21,16 +23,16 @@ export function LoginModal() {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-xs text-slate-500">Use your provisioned account{loginRole === 'officer' ? ' (demo: R. Singh)' : ' (demo: Arjun Mishra)'}.</p>
-          <button
+          {demoEmail && demoPassword && <button
             type="button"
             onClick={() => {
-              setEmail('arjun.janseva@gmail.com')
-              setPassword('JanSevaSecurePassword2026!')
+              setEmail(demoEmail)
+              setPassword(demoPassword)
             }}
             className="text-[11px] font-bold text-violet-700 hover:underline bg-violet-50 px-2 py-0.5 rounded border border-violet-200"
           >
             Auto-fill
-          </button>
+          </button>}
         </div>
         <label className="block text-xs font-semibold">Email
           <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />

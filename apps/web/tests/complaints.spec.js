@@ -34,6 +34,17 @@ test('citizen submits, officer updates, citizen returns and refresh retains tick
   expect(saved.official_status).toBe('NOT_FILED')
   expect(saved.assigned_officer_id).toBeTruthy()
   await expect(review).toBeHidden()
+  await expect(page.getByText('Internal Ticket Successfully Saved!', { exact: true })).toBeVisible()
+  await expect(page.getByPlaceholder('e.g. Streetlight not working near City Park')).toHaveValue('')
+  await expect(page.getByLabel('Locality', { exact: true })).toHaveValue('')
+  await expect(page.getByRole('link', { name: 'Track Status →' })).toHaveAttribute('href', `/track?id=${saved.id}`)
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async () => { throw new Error('Clipboard permission denied') },
+    } })
+  })
+  await page.getByRole('button', { name: 'Copy ID', exact: true }).click()
+  await expect(page.getByText('Could not copy. Select the tracking ID and copy it manually.')).toBeVisible()
   await page.goto('/requests')
   await expect(page.getByText(saved.id, { exact: true }).first()).toBeVisible()
   await page.getByRole('link', { name: 'View details & audit history' }).first().click()
