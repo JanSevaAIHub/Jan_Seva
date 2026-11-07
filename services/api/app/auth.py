@@ -9,6 +9,7 @@ import jwt
 from jwt import PyJWKClient
 from jwt.exceptions import PyJWKClientConnectionError, PyJWTError
 from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import ConfigurationError, get_settings
@@ -70,7 +71,31 @@ def get_current_user(
 ) -> Profile:
     profile = db.get(Profile, user_id)
     if profile is None:
-        raise HTTPException(403, detail={"code": "PROFILE_REQUIRED", "message": "An authorized profile has not been provisioned."})
+        profile = provision_citizen_profile(db, user_id)
+    return profile
+
+
+def provision_citizen_profile(db: Session, user_id: UUID) -> Profile:
+    """Create the default citizen profile for a verified first-time user.
+
+    User IDs come from the verified Supabase JWT. The role, display name and
+    optional profile fields are server-owned; request data cannot set them.
+    """
+    profile = db.get(Profile, user_id)
+    if profile is not None:
+        return profile
+
+    profile = Profile(user_id=user_id, name="Citizen", role=Role.CITIZEN)
+    db.add(profile)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Another request or an admin setup may have inserted this user after
+        # our initial lookup. Keep the authoritative row and its assigned role.
+        db.rollback()
+        profile = db.get(Profile, user_id)
+        if profile is None:
+            raise
     return profile
 
 
