@@ -23,3 +23,4 @@ def toggle_role(target_role: str | None = None):
 if __name__ == "__main__":
     role_arg = sys.argv[1] if len(sys.argv) > 1 else None
     toggle_role(role_arg)
+
