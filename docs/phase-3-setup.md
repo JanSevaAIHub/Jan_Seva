@@ -1,5 +1,7 @@
 # Phase 3: scheme RAG implementation and execution evidence
 
+Historical report. The 2026-11-09 [Phase 1 RAG foundation update](developer-a-phase-1-rag.md) supersedes the dataset count, chunk identities, retrieval fallback behavior and verification counts below. Existing setup/migration commands still apply; no new migration was added.
+
 Implementation uses straightforward Python, existing httpx/SQLAlchemy, one OpenAI embedding provider and exact pgvector cosine search in the existing PostgreSQL database. No LangChain, LangGraph, second vector database, reranking, hybrid retrieval or complaint/officer implementation changes were introduced. Live completion is blocked by missing database and model configuration; the definition of done is **not yet met** for actual stored PostgreSQL embeddings and live retrieval.
 
 ## Corpus

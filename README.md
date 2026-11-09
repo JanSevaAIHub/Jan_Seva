@@ -82,7 +82,7 @@ A verified first-time user now receives a server-owned citizen profile automatic
 
 Only the configured demo citizen's **new** complaints are assigned to the configured officer. Both profiles must exist and the assignee must be an officer. Absent assignment leaves tickets unassigned; partial/invalid configuration fails closed. This grants no other user's access and does not reassign historical tickets.
 
-The checked-in corpus contains **8 schemes, 8 reviewed source notes and 8 current chunks**: PM-KISAN, NMMSS, PMSBY, PMJJBY, APY, Sukanya Samriddhi, PM Vishwakarma and Punjab Ashirwad. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
+The checked-in corpus contains **12 schemes, 12 reviewed source notes and 12 current chunks**: the original eight plus PM-SYM and Ladakh-reviewed IGNOAPS, IGNWPS and IGNDPS. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
 
 ## Running
 
@@ -114,7 +114,7 @@ See [API contract](docs/api-contract.md). Complaint edit/delete and government s
 
 ## RAG and complaint workflows
 
-Ingestion validates curated metadata and official HTTPS URLs, chunks reviewed evidence, calls real embeddings and stores compatible vectors. Retrieval embeds the question and uses exact pgvector cosine distance (`<=>`) against active passages. The Responses model selects complete stored paragraphs under a strict schema. Local checks reject invented text, unknown chunks and changed URLs. Citations describe reviewed summaries, not verbatim government quotes. Insufficient evidence returns uncertainty; an unavailable LLM can return a labeled extractive fallback. Embedding/database failures return errors, never fake vectors. There is no personalized eligibility engine. Live retrieval relevance and ingestion idempotence still need the configured evaluation.
+Ingestion cleans reviewed source text, preserves paragraph boundaries and targets roughly 250 to 450 estimated English tokens per passage, retaining short sources and final tails. Content-derived chunk UUIDs retain superseded evidence as inactive; unchanged text reuses stored vectors. Ingestion and query use the same configured embedding model and dimension, checked against the pgvector column. Retrieval returns up to five active source-linked passages with state/category filters. Provider failure can use labelled deterministic lexical ranking over real stored chunks; database or vector-schema errors still fail closed. Responses contain locally validated complete source paragraphs and official citations, with uncertainty when evidence is insufficient. Missing LLM access produces an explicit extractive fallback. No fake vectors are generated. Live vector relevance and ingestion idempotence remain unverified. See [the current RAG foundation report](docs/developer-a-phase-1-rag.md).
 
 Complaints use database UUIDs, authenticated ownership, real timestamps and atomic events. The only progression is `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Officer authorization requires a verified session, database role and assignment. Filing starts at `NOT_FILED`; a citizen reference is only `USER_REPORTED_FILED`, never verified official submission or resolution.
 

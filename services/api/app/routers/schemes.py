@@ -1,6 +1,6 @@
 """Public, read-only scheme discovery from the real database and pgvector."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -46,7 +46,7 @@ def unavailable(error):
 
 
 @router.get("", response_model=list[SchemeCard], dependencies=[Depends(model_request_budget)])
-def list_schemes(query: str | None = Query(default=None, min_length=3, max_length=1000),
+def list_schemes(response: Response, query: str | None = Query(default=None, min_length=3, max_length=1000),
                   state: str | None = Query(default=None, min_length=2, max_length=100),
                   category: str | None = Query(default=None, min_length=2, max_length=100),
                   limit: int = Query(default=10, ge=1, le=50), db: Session = Depends(get_db)):
@@ -54,12 +54,14 @@ def list_schemes(query: str | None = Query(default=None, min_length=3, max_lengt
         if len(query.strip()) < 3:
             raise HTTPException(422, detail={"code": "INVALID_QUERY", "message": "Enter at least three non-whitespace characters."})
         try:
-            passages = retrieve(db, query, state, category, limit=min(limit, 10))
+            passages = retrieve(db, query, state, category, limit=min(limit, 5))
         except (ConfigurationError, ProviderError) as error:
             raise unavailable(error) from None
         ids = list(dict.fromkeys(p.scheme_id for p in passages))
+        response.headers["X-Scheme-Retrieval"] = getattr(passages, "method", "pgvector_cosine_retrieval")
         schemes = {s.id: s for s in db.scalars(select(Scheme).where(Scheme.id.in_(ids)))}
         return [card(schemes[id]) for id in ids if id in schemes]
+    response.headers["X-Scheme-Retrieval"] = "stored_records"
     result = select(Scheme).order_by(Scheme.title).limit(limit)
     if state:
         result = result.where((func.lower(Scheme.state) == state.strip().lower()) | (Scheme.state == "National"))
