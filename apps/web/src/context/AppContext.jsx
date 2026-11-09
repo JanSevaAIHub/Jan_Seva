@@ -3,6 +3,7 @@ import { supabase, authConfigurationError } from '../lib/supabase'
 import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
 import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
+import { agentReply } from '../lib/agent'
 
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
@@ -102,14 +103,33 @@ export function AppProvider({ children }) {
   const schemeChatVersion = useRef(0)
   const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
+  const [agentMessages, setAgentMessages] = useState([])
+  const [agentError, setAgentError] = useState('')
+  const [agentTyping, setAgentTyping] = useState(false)
+  const [agentComplaintDraft, setAgentComplaintDraft] = useState(null)
+  const agentBusy = useRef(false)
+  const agentVersion = useRef(0)
+  const agentSession = useRef(null)
+  const agentMessageId = useRef(0)
+
+  const clearAgentChat = useCallback(() => {
+    agentVersion.current += 1
+    agentBusy.current = false
+    agentSession.current = null
+    setAgentMessages([])
+    setAgentError('')
+    setAgentTyping(false)
+    setAgentComplaintDraft(null)
+  }, [])
 
   const clearSchemeChat = useCallback(() => {
+    clearAgentChat()
     schemeChatVersion.current += 1
     schemeChatBusy.current = false
     setChatMessages([])
     setSchemeChatError('')
     setIsAiTyping(false)
-  }, [])
+  }, [clearAgentChat])
 
   // Add toast notification
   const addToast = (message, type = 'success') => {
@@ -370,6 +390,29 @@ export function AppProvider({ children }) {
     }
   }
 
+  const sendAgentMessage = async message => {
+    if (agentBusy.current || message.trim().length < 3) return false
+    agentBusy.current = true
+    const version = agentVersion.current, id = ++agentMessageId.current
+    setAgentTyping(true)
+    setAgentError('')
+    setAgentMessages(prev => [...prev, { id: `agent-u-${id}`, sender: 'user', text: message }])
+    try {
+      const reply = agentReply(await schemeApiRequest('/agent/message', { method: 'POST', timeoutMs: 160000,
+        body: { message, ...(agentSession.current ? { session_id: agentSession.current } : {}),
+          ...(Object.keys(schemeProfileRef.current).length ? { profile: schemeProfileRef.current } : {}) } }))
+      if (version !== agentVersion.current) return false
+      agentSession.current = reply.session_id
+      setAgentMessages(prev => [...prev, { id: `agent-a-${id}`, sender: 'assistant', text: reply.response, ...reply }])
+      return true
+    } catch (error) {
+      if (version === agentVersion.current) setAgentError(error.message)
+      return false
+    } finally {
+      if (version === agentVersion.current) { agentBusy.current = false; setAgentTyping(false) }
+    }
+  }
+
   // Selecting a persona opens sign-in. Only /api/me establishes its role.
   const switchUserRole = newRole => { setAuthError(''); setLoginRole(newRole) }
   const signIn = async (email, password) => {
@@ -444,7 +487,8 @@ export function AppProvider({ children }) {
         removeToast,
         chatMessages,
         sendChatMessage,
-        isAiTyping
+        isAiTyping,
+        agentMessages, agentError, agentTyping, sendAgentMessage, agentComplaintDraft, setAgentComplaintDraft
       }}
     >
       {children}

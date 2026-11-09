@@ -2,7 +2,7 @@
 
 Base path: `/api`. JSON requests and responses. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
 
-Phase 2 registered routes: `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`; complaint AI and agent routes remain unimplemented. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
+Registered routes include `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`. Phase 3 adds `POST /agent/message`. Complaint analysis remains unimplemented and is reported as an unavailable capability. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
 
 `ComplaintCreate` accepts only `{title, description, category, locality}`. A citizen's verified identity supplies ownership; the create response is 201 with `ComplaintDetail`. List returns `ComplaintDetail[]` including events for the existing list timelines, scoped to citizen ownership or officer assignment; `?status=` optionally filters. Officer PATCH accepts `{status, note?}` and advances exactly one step: `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Invalid transitions return 409. Update and audit event commit atomically. Notes may be omitted, in which case the server records a default note.
 
@@ -17,13 +17,13 @@ The owner-only reference route accepts `{official_ref}` and returns `ComplaintDe
 | GET | `/schemes?query=&state=&category=&limit=` | optional filters | database `SchemeCard[]`; vector query when provided |
 | POST | `/schemes/ask` | `{ "message": string, "profile"?: {state?, occupation?}, "state"?: string, "category"?: string }` | `{ "answer": string, "citations": SchemeCitation[], "tool_trace": ToolTrace[], "mode": string }` |
 | POST | `/schemes/eligibility` | `{ "scheme_id": UUID, "profile": EligibilityProfile }` | `{ "scheme_id": UUID, "status": EligibilityStatus, "matched_rules": string[], "missing_fields": string[], "reasons": string[], "citations": EligibilityCitation[] }` |
-| POST | `/complaints/analyze` | `{ "title": string, "description": string, "locality": string }` | `{ "category": ComplaintCategory, "department": string, "duplicates": DuplicateSuggestion[], "draft": string }` |
+| POST | `/complaints/analyze` | Proposed; not implemented: `{ "title": string, "description": string, "locality": string }` | Planned analysis contract only; agent reports unavailable |
 | POST | `/complaints` | confirmed `ComplaintCreate` | 201 `ComplaintDetail` with `LOCAL_SUBMITTED` internal status |
 | GET | `/complaints?status=` | authenticated + ownership/assignment scope | `ComplaintDetail[]` |
 | GET | `/complaints/{id}` | authenticated + owner/officer check | `ComplaintDetail` including internal events |
 | PATCH | `/officer/complaints/{id}` | assigned officer only: `{ "status": InternalStatus, "note"?: string }` | updated `ComplaintDetail`; append audit event |
 | PATCH | `/complaints/{id}/official-ref` | citizen owner: `{ "official_ref": string }` | `ComplaintDetail`; internal status unchanged |
-| POST | `/agent/message` | `{ "message": string, "session_id"?: string }` | `{ "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "citations": Citation[], "actions": ToolTrace[] }` |
+| POST | `/agent/message` | `{ "message": string, "session_id"?: UUID, "profile"?: EligibilityProfile, "scheme_id"?: UUID, "complaint"?: ComplaintDraft }` | `{ "session_id": UUID, "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "status": AgentStatus, "citations": Citation[], "actions": AgentAction[], "tool_trace": ToolTrace[], "eligibility": EligibilityResult[] }` |
 
 ## Phase 3 implemented scheme boundary
 
@@ -115,3 +115,21 @@ Both scheme endpoints retain their existing JSON contracts. Citations already co
 - Ingestion validates the entire corpus before writing, checks vector batch length/dimensions, and safely upserts within the existing per-scheme transactions/advisory locks. `clean-paragraph-v2` content-derived chunk IDs keep changed/superseded evidence inactive instead of replacing old cited text. An authorized first reingestion creates the new chunk identities and may incur embedding cost; exact reruns reuse them. No migrations or live ingestion run automatically.
 
 See [the implementation report](developer-a-phase-1-rag.md) and [captured local API responses](phase-1-rag-examples.json). Live PostgreSQL/pgvector/provider checks remain blocked by missing configuration.
+
+## Single-agent boundary (Phase 3)
+
+`POST /api/agent/message` accepts a trimmed 3–1000-character message. Optional session/scheme IDs are UUIDs. Profile fields use the deterministic eligibility schema; no age/income is inferred from free text. Optional `complaint` contains only user-supplied `title` (up to 250 characters), `description` (up to 5000), `locality` (up to 250) and an existing category code or null. No browser role, user ID, status, government reference or executable tool/action is accepted. Unexpected fields return 422.
+
+The public endpoint accepts guest questions. If a bearer token is supplied, existing JWT verification must succeed; invalid tokens return 401. Private complaint reads additionally resolve the verified user's stored profile and reuse Developer B's scoped list function. An absent established identity produces a sign-in suggestion, never private data. Session IDs are opaque correlation values echoed/generated for the current browser conversation; there is no server conversation store or authorization lookup by session ID.
+
+Intents keep the planned lowercase contract: `scheme` (SCHEME), `complaint` (COMPLAINT), `mixed` (MIXED) and `clarify` (AMBIGUOUS). Structured model output can choose only an intent, not a tool, permission, identity or narrative. When the classifier fails/unconfigured, conservative explicit-term routing is labelled in the trace. Source text and messages are untrusted data.
+
+`AgentStatus` is `ok | partial | needs_info | unavailable`. A missing complaint analysis service produces `partial`, an explicit explanation and a draft containing only supplied text. It never produces a guessed category/department/duplicates result. Scheme insufficiency/ambiguity produces uncertainty; all failed scheme tools without a useful result return sanitized 503 `AGENT_TOOLS_UNAVAILABLE`. Existing database configuration/outage errors remain sanitized 503s. Provider timeouts/errors are handled without disclosing raw errors or credential values.
+
+`AgentAction` extends the planned `ToolTrace` fields `{tool,status,detail}` with `{label,path,requires_confirmation,draft?}`. Paths are restricted to `/schemes`, `/complaints/new`, `/requests`. Complaint proposals always require confirmation; a proposal is not an executed write. Draft actions transfer only editable text into the existing complaint form. Creating an internal ticket still requires its separate authenticated review/confirmation. Agent tools cannot create/update/delete complaints, send messages, submit to government portals or assert registration. Ticket reads distinguish internal status from unverified citizen-reported government references.
+
+Agent citations retain scheme identity/title, official URL, review date, exact excerpt and evidence kind. Retrieved evidence also includes actual chunk IDs; rule-source citations from deterministic eligibility have no invented chunk ID. The evidence gate checks active stored chunks, scheme/source correspondence, complete paragraphs, response text, review metadata and source-injection markers. Formatting reconstructs permitted source answers rather than accepting arbitrary model claims. Structured eligibility results remain separate and use only stored rules.
+
+The endpoint shares the existing public model request/concurrency budget. It uses one finite LangGraph workflow with no write tools, checkpointer or server-side chat persistence; optional third-party tracing is disabled for this graph. The frontend stores temporary history in provider memory, prevents simultaneous sends, retains text on failure and clears history/pending results/draft transfers on account change. The browser allows up to 160 seconds for sequential bounded provider work; no mutation is retried automatically.
+
+See [Day 1 handoff](dev-a-day1-handoff.md) and [actual local agent responses](phase-3-agent-examples.json). Full Day 1 completion remains partial until complaint analysis and hosted integration gates pass.

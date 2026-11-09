@@ -17,6 +17,16 @@ INSTRUCTION_MARKERS = re.compile(
     r"reveal\b.{0,50}\b(?:api[ -]?key|secret|system prompt)\b", re.IGNORECASE)
 
 
+def render_evidence_answer(citations, mode, lexical=False):
+    if mode == "extractive_fallback":
+        notice = "Extractive fallback — the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n"
+    else:
+        notice = "Relevant passages from reviewed official-source summaries follow. These are not an eligibility decision; omitted conditions and current availability must be checked with the administering authority.\n\n"
+    if lexical:
+        notice = "Lexical retrieval fallback — embedding service unavailable; matches use stored text terms.\n\n" + notice
+    return notice + "\n\n".join(f"[{i + 1}] {c.title}\n{c.excerpt}" for i, c in enumerate(citations))
+
+
 def citation(passage, excerpt):
     return Citation(scheme_id=passage.scheme_id, chunk_id=passage.chunk_id, title=passage.title,
         url=passage.source_url, excerpt=excerpt, reviewed_at=passage.reviewed_at)
@@ -47,10 +57,7 @@ def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
         trace.append(ToolTrace(tool="grounded_generation", status="error", detail="LLM unavailable; returning explicitly labelled, unmodified related extracts."))
         related = passages[:3]
         citations = [citation(p, p.text) for p in related]
-        answer = "Extractive fallback — the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n"
-        if method == "lexical_fallback":
-            answer = "Lexical retrieval fallback — embedding service unavailable; matches use stored text terms.\n\n" + answer
-        answer += "\n\n".join(f"[{i + 1}] {p.title}\n{p.text}" for i, p in enumerate(related))
+        answer = render_evidence_answer(citations, "extractive_fallback", method == "lexical_fallback")
         return SchemeAnswer(answer=answer, citations=citations, tool_trace=trace, mode="extractive_fallback")
     known = {str(p.chunk_id): p for p in passages}
     citations, used = [], set()
@@ -81,8 +88,5 @@ def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
     trace.append(ToolTrace(tool="citation_validation", status="ok", detail=f"Accepted {len(citations)} stored paragraphs; removed {rejected} unsupported citations/selections."))
     if not citations:
         return insufficient(trace)
-    answer = "Relevant passages from reviewed official-source summaries follow. These are not an eligibility decision; omitted conditions and current availability must be checked with the administering authority.\n\n"
-    if method == "lexical_fallback":
-        answer = "Lexical retrieval fallback — embedding service unavailable; matches use stored text terms.\n\n" + answer
-    answer += "\n\n".join(f"[{i + 1}] {c.title}\n{c.excerpt}" for i, c in enumerate(citations))
+    answer = render_evidence_answer(citations, "grounded_extracts", method == "lexical_fallback")
     return SchemeAnswer(answer=answer, citations=citations, tool_trace=trace, mode="grounded_extracts")

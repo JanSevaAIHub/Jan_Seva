@@ -6,11 +6,13 @@ An independent citizen-assistance portfolio project: discover public schemes wit
 
 Phase 2 Scheme Navigator update (2026-11-09): the existing discovery screen now supports a tab-local editable profile, deterministic eligibility checks with exact values or ranges, source-evidence drawers, and search/filter/retry flows. Local integration is verified with isolated stored data; hosted services remain unverified. See [the Phase 2 report](docs/developer-a-phase-2-ui.md).
 
+Phase 3 update (2026-11-09): the homepage now calls one read-only LangGraph agent. Scheme, complaint, mixed and ambiguous routing, evidence checks, deterministic eligibility and confirmation-only draft transfer are locally tested. Complaint analysis remains unavailable; hosted integrations are unverified, so Day 1 status is **PARTIAL**. See [Developer A handoff](docs/dev-a-day1-handoff.md).
+
 ## Technology and architecture
 
 - Frontend: React 19, JavaScript, Vite 8, React Router, existing CSS/Tailwind utilities, Lucide icons and Supabase JavaScript client.
 - Backend: Python, FastAPI, Pydantic, SQLAlchemy 2, psycopg, PyJWT and httpx.
-- Services: PostgreSQL with pgvector, Supabase Auth with asymmetric signing keys, and OpenAI embeddings/Responses through server-side HTTP calls. No LangChain or separate vector database.
+- Services: PostgreSQL with pgvector, Supabase Auth with asymmetric signing keys, and OpenAI embeddings/Responses through server-side HTTP calls. LangGraph coordinates one read-only assistant workflow; no separate vector database.
 - Tests: pytest, Node test runner and Playwright/Chromium. SQLite and a local Auth provider double are used only in isolated tests.
 
 ```mermaid
@@ -107,6 +109,7 @@ Open `http://127.0.0.1:5173`; API docs: `http://127.0.0.1:8000/docs`. `/api/heal
 | `GET /api/schemes` | Stored schemes; optional query, state, category and limit |
 | `POST /api/schemes/ask` | Retrieved, validated evidence answer and citations |
 | `POST /api/schemes/eligibility` | Deterministic stored-rule assessment with reasons, missing fields and sources |
+| `POST /api/agent/message` | Single LangGraph assistant, verified scheme evidence and confirmation-only complaint proposals |
 | `POST /api/complaints` | Citizen creates complaint and initial event atomically |
 | `GET /api/complaints` | Own citizen tickets or assigned officer queue; optional status |
 | `GET /api/complaints/{id}` | Authorized detail and audit history |
@@ -125,7 +128,7 @@ Complaints use database UUIDs, authenticated ownership, real timestamps and atom
 
 JWT signatures, issuer, audience, required claims and expiry are validated against trusted JWKS. Roles come from database profiles, never a React role selector. Owner/assignment checks protect complaint reads and updates. Request validation, parameterized SQL, atomic writes, sanitized errors and explicit CORS origins are present. Offline token verification does not provide immediate session revocation.
 
-Public AI requests (scheme queries and `/schemes/ask`) share an in-process limit: **10 per client per minute, 30 total per minute, and 2 concurrent requests**. Excess work receives 429 with `Retry-After`; plain stored-scheme listing does not consume this budget. These limits reset on restart and are separate for each worker: shared quotas and billing controls are still required before public deployment. Other limits: no live-provider/deployment verification or CI, Python dependency ranges without a lockfile, configured bundle size advisory, session-only bookmarks, no upload/GPS verification, general homepage AI/voice, notification/translation backend, complaint AI/deduplication or government integration. The UI prevents simultaneous confirmation clicks, but mutations have no server idempotency keys: a lost response may follow a committed write. Source coverage is small and date-sensitive; inclusion does not guarantee eligibility or current availability. The scoped secret scan is not comprehensive security certification. PR #2's inherited demo password must be rotated by its owner if real; it is absent from the current source but remains in preserved history.
+Public AI requests (scheme queries, `/schemes/ask` and `/agent/message`) share an in-process limit: **10 per client per minute, 30 total per minute, and 2 concurrent requests**. Excess work receives 429 with `Retry-After`; plain stored-scheme listing does not consume this budget. These limits reset on restart and are separate for each worker: shared quotas and billing controls are still required before public deployment. Other limits: no live-provider/deployment verification or CI, Python dependency ranges without a lockfile, configured bundle size advisory, session-only bookmarks, no upload/GPS verification, voice input, notification/translation backend, complaint AI/deduplication or government integration. The UI prevents simultaneous confirmation clicks, but mutations have no server idempotency keys: a lost response may follow a committed write. Source coverage is small and date-sensitive; inclusion does not guarantee eligibility or current availability. The scoped secret scan is not comprehensive security certification. PR #2's inherited demo password must be rotated by its owner if real; it is absent from the current source but remains in preserved history.
 
 ## Measured verification and demo
 
