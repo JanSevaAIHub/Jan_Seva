@@ -9,7 +9,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --navy: #17183b;
+  --navy: #171A45;
   --violet: #5443c7;
   --violet-hover: #4332b5;
   --teal: #00a8a0;
@@ -17,6 +17,36 @@
   --line: #e8e9f2;
   --cloud: #f5f6fb;
   --surface: #ffffff;
+}
+
+/* Scheme Discovery keeps the existing grid/cards and applies its design palette. */
+.scheme-discovery {
+  --color-violet-600: #6552CE;
+  --color-violet-700: #5140b0;
+  --color-teal-600: #00A8A0;
+  --color-orange-500: #F58B30;
+  overflow-wrap: anywhere;
+}
+.scheme-discovery .grid > *,
+.scheme-discovery input, .scheme-discovery select { min-width: 0; }
+.scheme-discovery :is(button, a, input, select, summary):focus-visible {
+  outline: 2px solid #6552CE;
+  outline-offset: 3px;
+}
+.scheme-profile-form :is(input, select) {
+  display: block;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px;
+  margin-top: 4px;
+  background: #f8fafc;
+}
+.scheme-dialog { overflow-wrap: anywhere; }
+.scheme-discovery [data-status="NEEDS_INFO"] { border: 1px solid #F58B30; }
+@media (max-width: 639px) {
+  .scheme-discovery [data-scheme-id] > .flex:first-child { flex-wrap: wrap; }
+  .scheme-discovery form > input { width: 0; }
 }
 
 * {

@@ -6,19 +6,20 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('Home navigation is honest and scheme listing comes from the actual isolated database', async ({ page, context }) => {
-  let chatRequests = 0
-  page.on('request', r => { if (r.url().endsWith('/api/schemes/ask')) chatRequests++ })
+  let agentRequests = 0
+  page.on('request', r => { if (r.url().endsWith('/api/agent/message')) agentRequests++ })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Citizen Services Assistant/ })).toBeVisible()
-  await expect(page.getByText('General-purpose chat and voice are not available here;', { exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ask JanSeva AI', exact: true })).toBeVisible()
   await expect(page.getByText('12.8 L+', { exact: true })).toHaveCount(0)
   await expect(page.getByText('96%', { exact: true })).toHaveCount(0)
   await expect(page.locator('main').getByRole('link', { name: /^Raise Complaint/ })).toHaveAttribute('href', '/complaints/new')
   await expect(page.getByRole('link', { name: /^Track Requests/ })).toHaveAttribute('href', '/track')
-  await page.getByPlaceholder('Search for schemes or published conditions...').fill('farmer')
-  await page.getByRole('button', { name: 'Search schemes', exact: true }).click()
+  await page.getByLabel('Message JanSeva AI').fill('Show farmer schemes')
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  await page.getByRole('log').getByRole('button', { name: 'Open Scheme Discovery', exact: true }).click()
   await expect(page).toHaveURL(/\/schemes$/)
-  expect(chatRequests).toBe(0)
+  expect(agentRequests).toBe(1)
   await page.getByPlaceholder('Search scheme name or keyword...').fill('')
   await expect(page.getByRole('heading', { name: 'Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)' })).toBeVisible()
   const link = page.getByRole('link', { name: 'Official Source', exact: true }).first()

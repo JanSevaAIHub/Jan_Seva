@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Search,
   Sparkles,
@@ -18,41 +18,13 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import heroBg from '../assets/hero-bg.png'
+import { HomeAssistant } from '../components/common/HomeAssistant'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
-const PROMPT_CHIPS = [
-  '✦ PM Kisan eligibility',
-  '✦ Raise road repair complaint',
-  '✦ Scholarship for students',
-  '✦ Track my request'
-]
-
 export function Home() {
-  const navigate = useNavigate()
-  const { setSchemeSearchQuery, complaints, schemes, loadSchemes, currentUser,
+  const { complaints, schemes, loadSchemes, currentUser,
     complaintsLoading, complaintsError, schemesLoading, schemesError } = useApp()
   useEffect(() => { loadSchemes() }, [loadSchemes])
-  const [query, setQuery] = useState('')
-
-  const handleSearch = (e) => {
-    e?.preventDefault()
-    if (!query.trim()) return
-    setSchemeSearchQuery(query)
-    navigate('/schemes')
-  }
-
-  const handleChip = (chip) => {
-    const text = chip.replace('✦ ', '')
-    if (text.toLowerCase().includes('road') || text.toLowerCase().includes('complaint')) {
-      navigate('/complaints/new')
-    } else if (text.toLowerCase().includes('track')) {
-      navigate('/track')
-    } else {
-      setSchemeSearchQuery(text)
-      navigate('/schemes')
-    }
-  }
-
   return (
     <div className="space-y-6">
       {/* ================= HERO BANNER ================= */}
@@ -79,59 +51,7 @@ export function Home() {
             </p>
           </div>
 
-          {/* Floating AI Search Container */}
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-white/80 space-y-3 max-w-xl">
-            {/* Header */}
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#4338ca]">
-              <Sparkles size={15} className="text-[#6552ce]" />
-              <span>Search reviewed schemes</span>
-            </div>
-
-            <p className="text-[11px] text-slate-500">Scheme search only. General-purpose chat and voice are not available here; ask source-grounded scheme questions on the next page.</p>
-            {/* Input Row */}
-            <form onSubmit={handleSearch} className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-full px-4 py-1.5 shadow-sm focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
-              <Search size={17} className="text-slate-400 flex-none" />
-              <input
-                type="text"
-                value={query}
-                minLength={3}
-                maxLength={1000}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search for schemes or published conditions..."
-                className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none py-1"
-              />
-              <button
-                type="button"
-                disabled
-                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-full hover:bg-slate-100 transition-colors"
-                title="Voice input is not available"
-              >
-                <Mic size={17} />
-              </button>
-              <button
-                type="submit"
-                className="flex-none w-8 h-8 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95"
-                aria-label="Search schemes"
-                disabled={query.trim().length < 3}
-              >
-                <ArrowRight size={15} />
-              </button>
-            </form>
-
-            {/* Prompt Chips */}
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              {PROMPT_CHIPS.map(chip => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => handleChip(chip)}
-                  className="px-3 py-1 rounded-full text-[11px] font-medium bg-white/90 hover:bg-violet-50 hover:text-violet-700 text-slate-600 border border-slate-200/80 shadow-xs transition-all active:scale-95"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </div>
+          <HomeAssistant />
         </div>
       </section>
 
@@ -171,7 +91,7 @@ export function Home() {
               Check Eligibility
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Review published conditions; personal eligibility assessment is unavailable
+              Check source-backed conditions using your editable profile
             </p>
           </div>
           <div className="self-end mt-2 text-violet-600 group-hover:translate-x-1 transition-transform">

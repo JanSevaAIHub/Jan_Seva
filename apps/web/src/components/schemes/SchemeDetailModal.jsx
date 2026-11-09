@@ -1,6 +1,7 @@
 import { X, ExternalLink, Bookmark, CheckCircle2, AlertCircle, FileText, ShieldCheck, Calendar } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useDialog } from '../../lib/useDialog'
+import { EligibilityAssessment } from './EligibilityAssessment'
 
 export function SchemeDetailModal() {
   const { activeSchemeModal, setActiveSchemeModal, savedSchemeIds, toggleSaveScheme } = useApp()
@@ -11,17 +12,18 @@ export function SchemeDetailModal() {
   const isSaved = savedSchemeIds.includes(activeSchemeModal.id)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+    <div className="scheme-discovery fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
       <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
+        className="scheme-dialog bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
+        aria-label="Scheme details"
         ref={dialogRef}
         tabIndex={-1}
         aria-modal="true"
       >
         {/* Header */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100">
               {activeSchemeModal.type}
             </span>
@@ -57,17 +59,15 @@ export function SchemeDetailModal() {
           </div>
 
           {/* Benefit Highlight Card */}
-          <div className="bg-gradient-to-r from-violet-50 via-indigo-50 to-teal-50 p-4 rounded-xl border border-violet-100/70 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-violet-50 via-indigo-50 to-teal-50 p-4 rounded-xl border border-violet-100/70 flex flex-wrap gap-3 items-center justify-between">
             <div>
               <div className="text-xs uppercase tracking-wider font-bold text-violet-700">Scheme Benefit</div>
               <div className="text-xl font-extrabold text-slate-900 mt-0.5">{activeSchemeModal.benefit}</div>
             </div>
-            <div className="text-right">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                <CheckCircle2 size={13} /> Eligibility not assessed
-              </span>
-            </div>
           </div>
+          <p className="text-xs text-slate-600">{activeSchemeModal.department || activeSchemeModal.category}</p>
+          <EligibilityAssessment scheme={activeSchemeModal} />
+          {activeSchemeModal.applicationUrl && <a href={activeSchemeModal.applicationUrl} target="_blank" rel="noreferrer" className="text-xs text-violet-700 underline">Official application portal</a>}
 
           {/* Official Grounded Source (Truthfulness Box) */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2">
@@ -80,7 +80,7 @@ export function SchemeDetailModal() {
                 <Calendar size={12} /> Reviewed: {activeSchemeModal.lastReviewed}
               </span>
             </div>
-            <blockquote className="text-xs text-slate-600 italic bg-white p-3 rounded-lg border border-slate-200">
+            <blockquote className="text-xs whitespace-pre-line text-slate-600 italic bg-white p-3 rounded-lg border border-slate-200">
               {activeSchemeModal.excerpt}
             </blockquote>
             <div className="flex items-center justify-between pt-1">
@@ -131,10 +131,10 @@ export function SchemeDetailModal() {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-2">
           <button
             onClick={() => setActiveSchemeModal(null)}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            className="shrink-0 whitespace-nowrap px-2 sm:px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
           >
             Close
           </button>
@@ -142,9 +142,9 @@ export function SchemeDetailModal() {
             href={activeSchemeModal.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-md shadow-violet-600/20 transition-all hover:scale-[1.02]"
+            className="inline-flex flex-1 sm:flex-none min-w-0 items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-md shadow-violet-600/20 transition-all hover:scale-[1.02]"
           >
-            Check Official Source &amp; Current Terms <ExternalLink size={14} />
+            Check Official Source &amp; Current Terms <ExternalLink size={14} className="shrink-0" />
           </a>
         </div>
       </div>
