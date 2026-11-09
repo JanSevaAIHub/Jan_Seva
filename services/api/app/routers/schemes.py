@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.corpus import official_url
+from app.ai.eligibility import EligibilityRequest, EligibilityResult, evaluate_eligibility
 from app.ai.budget import ModelBudget
 from app.ai.provider import ProviderError
 from app.ai.rag import answer_question
@@ -16,6 +17,14 @@ from app.models import Scheme
 
 router = APIRouter(prefix="/schemes", tags=["schemes"])
 model_budget = ModelBudget()
+
+
+@router.post("/eligibility", response_model=EligibilityResult)
+def check_eligibility(request: EligibilityRequest, db: Session = Depends(get_db)):
+    scheme = db.get(Scheme, request.scheme_id)
+    if scheme is None:
+        raise HTTPException(404, detail={"code": "SCHEME_NOT_FOUND", "message": "Scheme was not found."})
+    return evaluate_eligibility(scheme, request.profile)
 
 
 def model_request_budget(request: Request):

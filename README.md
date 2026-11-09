@@ -4,6 +4,8 @@ An independent citizen-assistance portfolio project: discover public schemes wit
 
 **Development status (2026-11-08): combined work stabilized locally; hosted integrations remain unverified.** This is a controlled demo candidate, not an approved public production release. See the current [stabilization report](docs/stabilization-report.md), [implementation status](docs/implementation-status.md), and historical [release review](docs/release-review.md).
 
+Phase 2 Scheme Navigator update (2026-11-09): the existing discovery screen now supports a tab-local editable profile, deterministic eligibility checks with exact values or ranges, source-evidence drawers, and search/filter/retry flows. Local integration is verified with isolated stored data; hosted services remain unverified. See [the Phase 2 report](docs/developer-a-phase-2-ui.md).
+
 ## Technology and architecture
 
 - Frontend: React 19, JavaScript, Vite 8, React Router, existing CSS/Tailwind utilities, Lucide icons and Supabase JavaScript client.
@@ -104,6 +106,7 @@ Open `http://127.0.0.1:5173`; API docs: `http://127.0.0.1:8000/docs`. `/api/heal
 | `GET /api/me` | Authenticated database profile/role |
 | `GET /api/schemes` | Stored schemes; optional query, state, category and limit |
 | `POST /api/schemes/ask` | Retrieved, validated evidence answer and citations |
+| `POST /api/schemes/eligibility` | Deterministic stored-rule assessment with reasons, missing fields and sources |
 | `POST /api/complaints` | Citizen creates complaint and initial event atomically |
 | `GET /api/complaints` | Own citizen tickets or assigned officer queue; optional status |
 | `GET /api/complaints/{id}` | Authorized detail and audit history |
@@ -114,7 +117,7 @@ See [API contract](docs/api-contract.md). Complaint edit/delete and government s
 
 ## RAG and complaint workflows
 
-Ingestion cleans reviewed source text, preserves paragraph boundaries and targets roughly 250 to 450 estimated English tokens per passage, retaining short sources and final tails. Content-derived chunk UUIDs retain superseded evidence as inactive; unchanged text reuses stored vectors. Ingestion and query use the same configured embedding model and dimension, checked against the pgvector column. Retrieval returns up to five active source-linked passages with state/category filters. Provider failure can use labelled deterministic lexical ranking over real stored chunks; database or vector-schema errors still fail closed. Responses contain locally validated complete source paragraphs and official citations, with uncertainty when evidence is insufficient. Missing LLM access produces an explicit extractive fallback. No fake vectors are generated. Live vector relevance and ingestion idempotence remain unverified. See [the current RAG foundation report](docs/developer-a-phase-1-rag.md).
+Ingestion cleans reviewed source text, preserves paragraph boundaries and targets roughly 250 to 450 estimated English tokens per passage, retaining short sources and final tails. Content-derived chunk UUIDs retain superseded evidence as inactive; unchanged text reuses stored vectors. Ingestion and query use the same configured embedding model and dimension, checked against the pgvector column. Retrieval returns up to five active source-linked passages with state/category filters. Provider failure can use labelled deterministic lexical ranking over real stored chunks; database or vector-schema errors still fail closed. Responses contain locally validated complete source paragraphs and official citations, with uncertainty when evidence is insufficient. Missing LLM access produces an explicit extractive fallback. No fake vectors are generated. Live vector relevance and ingestion idempotence remain unverified. See [the current RAG foundation report](docs/developer-a-phase-1-rag.md). The public eligibility endpoint evaluates versioned stored rules without model calls; incomplete rules or missing information require further review. See [the current implementation report](docs/developer-a-phase-2-ui.md).
 
 Complaints use database UUIDs, authenticated ownership, real timestamps and atomic events. The only progression is `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Officer authorization requires a verified session, database role and assignment. Filing starts at `NOT_FILED`; a citizen reference is only `USER_REPORTED_FILED`, never verified official submission or resolution.
 

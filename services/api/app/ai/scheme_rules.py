@@ -6,6 +6,22 @@ from pydantic import Field, StrictBool, model_validator
 from app.schemas import APIModel
 
 
+class IncomeRange(APIModel):
+    min: float = Field(strict=True, ge=0, allow_inf_nan=False)
+    max: float = Field(strict=True, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.min > self.max:
+            raise ValueError("Range minimum must not exceed its maximum")
+        return self
+
+
+class AgeRange(IncomeRange):
+    min: int = Field(strict=True, ge=0, le=150)
+    max: int = Field(strict=True, ge=0, le=150)
+
+
 class EligibilityProfile(APIModel):
     age: int | None = Field(default=None, strict=True, ge=0, le=150)
     state: str | None = Field(default=None, min_length=2, max_length=100)
@@ -21,11 +37,21 @@ class EligibilityProfile(APIModel):
     other_government_pension: StrictBool | None = None
     participating_account: StrictBool | None = None
     auto_debit_consent: StrictBool | None = None
+    age_range: AgeRange | None = None
+    annual_income_range: IncomeRange | None = None
+    monthly_income_range: IncomeRange | None = None
+
+    @model_validator(mode="after")
+    def one_precision_per_field(self):
+        for field in ("age", "annual_income", "monthly_income"):
+            if getattr(self, field) is not None and getattr(self, field + "_range") is not None:
+                raise ValueError("Supply an exact value or a range, not both")
+        return self
 
 
 NUMERIC = {"age", "annual_income", "monthly_income", "disability_percent"}
 TEXT = {"state", "occupation"}
-BOOLEAN = set(EligibilityProfile.model_fields) - NUMERIC - TEXT
+BOOLEAN = set(EligibilityProfile.model_fields) - NUMERIC - TEXT - {"age_range", "annual_income_range", "monthly_income_range"}
 UNKNOWN = {"unknown", "unsure", "not sure", "n/a", "prefer not to say"}
 
 
@@ -37,7 +63,7 @@ class EligibilityRule(APIModel):
 
     @model_validator(mode="after")
     def valid_condition(self):
-        if self.field not in EligibilityProfile.model_fields:
+        if self.field not in NUMERIC | TEXT | BOOLEAN:
             raise ValueError("Unsupported rule field")
         if self.op == "present":
             if self.field not in TEXT or self.value is not None:

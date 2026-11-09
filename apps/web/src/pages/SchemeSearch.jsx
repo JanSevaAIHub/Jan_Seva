@@ -23,6 +23,8 @@ import {
   ChevronDown
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { SchemeProfileEditor } from '../components/schemes/SchemeProfileEditor'
+import { EligibilityAssessment, EligibilityBadge } from '../components/schemes/EligibilityAssessment'
 
 export function SchemeSearch() {
   const {
@@ -38,7 +40,7 @@ export function SchemeSearch() {
     isAiTyping,
     currentUser,
     session,
-    selectedState, setSelectedState
+    selectedState, setSelectedState, eligibility, checkEligibility, invalidateSchemeSearch, setActiveCitation
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('all') // 'recommended' | 'all' | 'saved'
@@ -53,10 +55,12 @@ export function SchemeSearch() {
   }, [chatMessages, isAiTyping])
 
   useEffect(() => {
-    if (schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3) return
+    const invalid = schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3
+    invalidateSchemeSearch(!invalid)
+    if (invalid) return
     const timer = setTimeout(() => loadSchemes({ query: schemeSearchQuery, state: selectedState, category: sectorFilter }), 300)
-    return () => clearTimeout(timer)
-  }, [schemeSearchQuery, selectedState, sectorFilter, loadSchemes])
+    return () => { clearTimeout(timer); invalidateSchemeSearch() }
+  }, [schemeSearchQuery, selectedState, sectorFilter, loadSchemes, invalidateSchemeSearch])
 
   const handleSendChat = async event => {
     event?.preventDefault()
@@ -84,7 +88,7 @@ export function SchemeSearch() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="scheme-discovery space-y-4">
       {/* Breadcrumb & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
@@ -172,6 +176,8 @@ export function SchemeSearch() {
                           {c.title}
                         </a>
                       ))}
+                      {msg.citations.map((c, i) => <button key={`evidence-${i}`} onClick={() => setActiveCitation(c)}
+                        className="text-[11px] text-violet-700 underline text-left">View evidence for {c.title}</button>)}
                     </div>
                   )}
                 </div>
@@ -303,7 +309,10 @@ export function SchemeSearch() {
             <select aria-label="Scheme state" value={selectedState} onChange={e => setSelectedState(e.target.value)} className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs bg-slate-50">
               <option value="All">All states</option><option value="Punjab">Punjab + National</option>
               <option value="Haryana">Haryana + National</option><option value="Uttar Pradesh">Uttar Pradesh + National</option>
+              <option value="Ladakh">Ladakh + National</option>
             </select>
+            <button onClick={() => { setSchemeSearchQuery(''); setSelectedState('All'); setSectorFilter('All'); setActiveTab('all') }}
+              className="text-xs text-violet-700 underline">Reset filters</button>
             <div className="flex-1 min-w-[140px] relative">
               <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
               <input
@@ -316,7 +325,7 @@ export function SchemeSearch() {
             </div>
           </div>
 
-          {schemesLoading && <p role="status" className="text-xs text-slate-500">Loading schemes from the database?</p>}
+          {schemesLoading && <p role="status" className="text-xs text-slate-500">Loading schemes from the database…</p>}
           {schemesError && <p role="alert" className="text-xs text-rose-700">{schemesError} <button onClick={() => loadSchemes({ query: schemeSearchQuery, state: selectedState, category: sectorFilter })} className="underline">Retry search</button></p>}
           {schemeSearchQuery.trim().length > 0 && schemeSearchQuery.trim().length < 3 && <p className="text-xs text-slate-500">Enter at least three characters to search.</p>}
           {/* Scheme Cards List */}
@@ -326,6 +335,7 @@ export function SchemeSearch() {
               return (
                 <div
                   key={scheme.id}
+                  data-scheme-id={scheme.id}
                   className="bg-white rounded-2xl border border-slate-200 hover:border-violet-300 p-5 shadow-sm hover:shadow-md transition-all duration-200 space-y-3"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -335,19 +345,12 @@ export function SchemeSearch() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-slate-900 leading-snug">{scheme.title}</h3>
-                        <p className="text-[11px] text-slate-500 line-clamp-1">{scheme.benefitShort} &bull; {scheme.category}</p>
+                        <p className="text-[11px] text-slate-500">{scheme.department || scheme.category}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-none">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        scheme.eligibilityStatus === 'POTENTIAL'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        <CheckCircle2 size={11} />
-                        Published conditions
-                      </span>
+                      <EligibilityBadge result={eligibility[scheme.id]?.result} />
                       <button
                         onClick={() => toggleSaveScheme(scheme.id)}
                         className={`p-1.5 rounded-lg border transition-colors ${
@@ -363,6 +366,10 @@ export function SchemeSearch() {
                   <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
                     {scheme.description}
                   </p>
+                  <EligibilityAssessment scheme={scheme} compact />
+                  <p className="text-[11px] text-slate-600">Verified records: {scheme.requiredDocuments.length ? scheme.requiredDocuments.join('; ') : 'No complete checklist verified.'}</p>
+                  <p className="text-[11px] text-slate-500">Reviewed {scheme.lastReviewed} · <a href={scheme.sourceUrl} target="_blank" rel="noreferrer" className="text-violet-700 underline">{scheme.sourceTitle}</a></p>
+                  {scheme.applicationUrl && <a href={scheme.applicationUrl} target="_blank" rel="noreferrer" className="text-xs text-violet-700 underline block">Official application portal</a>}
 
                   {/* Metadata Chips */}
                   <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -378,13 +385,15 @@ export function SchemeSearch() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
                     <button
                       onClick={() => setActiveSchemeModal(scheme)}
                       className="text-xs font-semibold text-violet-700 hover:text-violet-900 inline-flex items-center gap-1 hover:underline"
                     >
                       View Details &amp; Citation &rarr;
                     </button>
+                    <button onClick={() => { setActiveSchemeModal(scheme); checkEligibility(scheme) }}
+                      disabled={eligibility[scheme.id]?.loading} className="text-xs font-semibold text-violet-700 underline disabled:opacity-50">Check eligibility</button>
 
                     <a
                       href={scheme.sourceUrl}
@@ -410,60 +419,7 @@ export function SchemeSearch() {
 
         {/* ================= RIGHT COLUMN: Profile & Documents (3 Cols) ================= */}
         <div className="lg:col-span-3 space-y-4">
-          {/* User Profile Card */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm">
-                {currentUser.avatar}
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900">{currentUser.name}</h4>
-                <p className="text-[11px] text-slate-500">{currentUser.occupation} &bull; {selectedState}</p>
-              </div>
-            </div>
-
-            {/* Profile Completeness */}
-            <div>
-              <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-slate-500 font-medium">Profile Completeness</span>
-                <span className="font-bold text-violet-700">{currentUser.completeness}%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-violet-600 to-teal-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${currentUser.completeness}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Eligibility & Documents Accordion */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Eligibility &amp; Documents
-              </h4>
-              <span className="text-[10px] text-slate-400 font-medium">Not assessed</span>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              {currentUser.documents?.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-2">
-                    {doc.verified ? (
-                      <CheckCircle2 size={14} className="text-emerald-600 flex-none" />
-                    ) : (
-                      <span className="w-3.5 h-3.5 rounded-full border border-amber-400 flex items-center justify-center text-[9px] text-amber-600">○</span>
-                    )}
-                    <span className="text-slate-700 text-[11px]">{doc.name}</span>
-                  </div>
-                  <span className={`text-[10px] font-semibold ${doc.verified ? 'text-emerald-700' : 'text-amber-600'}`}>
-                    {doc.verified ? 'Verified' : 'Pending'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SchemeProfileEditor />
 
           {/* Official Sources Card */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2.5">
