@@ -65,7 +65,10 @@ def ingest_record(db: Session, record) -> tuple[int, int]:
             "evidence_file": record.evidence_file, "chunk_index": index, "reviewed_at": record.reviewed_at.isoformat(), "evidence_kind": "reviewed_paraphrase"}
         if index in vectors:
             db.execute(text("UPDATE public.scheme_chunks SET embedding_vector=CAST(:vector AS vector) WHERE id=:id"), {"vector": json.dumps(vectors[index]), "id": ids[index]})
-        db.execute(text("UPDATE public.scheme_chunks SET source_metadata=CAST(:metadata AS jsonb), is_current=true WHERE id=:id"), {"metadata": json.dumps(metadata), "id": ids[index]})
+        # Source corrections do not require new embeddings, but the stored URL
+        # must stay aligned with the scheme and metadata on every rerun.
+        db.execute(text("UPDATE public.scheme_chunks SET source_url=:source_url, source_metadata=CAST(:metadata AS jsonb), is_current=true WHERE id=:id"),
+                   {"source_url": record.source_url, "metadata": json.dumps(metadata), "id": ids[index]})
     return len(chunks), len(pending)
 
 

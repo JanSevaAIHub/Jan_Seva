@@ -1,0 +1,121 @@
+{
+  "environment": "Actual FastAPI TestClient responses; real curated corpus in isolated SQLite; PostgreSQL catalog and provider outage doubles; no hosted integration",
+  "examples": [
+    {
+      "method": "GET",
+      "path": "/api/schemes?query=Sukanya%20Samriddhi%20documents&limit=5",
+      "status": 200,
+      "retrieval_header": "lexical_fallback",
+      "body": [
+        {
+          "id": "8bb35ca0-ed59-5cac-a939-8cbf4830cf03",
+          "title": "Sukanya Samriddhi Yojana (SSY)",
+          "category": "Savings",
+          "state": "National",
+          "description": "Government small-savings account for the future education and other permitted needs of a girl child.",
+          "source_url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44",
+          "rules_json": {
+            "corpus": "janseva-curated-v1",
+            "slug": "ssy",
+            "eligibility": "A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.",
+            "department": "Department of Economic Affairs",
+            "scope": "Central",
+            "application_url": null,
+            "rules_version": 1,
+            "eligibility_rules": [
+              {
+                "field": "age",
+                "op": "lte",
+                "value": 9.0,
+                "evidence": "A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement."
+              }
+            ],
+            "unmodeled_conditions": [
+              "Age is that of the girl child; citizenship, guardian, existing account and family exceptions require verification."
+            ],
+            "required_documents": [
+              "Sukanya Samriddhi account opening form",
+              "Girl child birth certificate",
+              "Aadhaar number",
+              "PAN or Form 60"
+            ],
+            "evidence_text": "Scheme: Sukanya Samriddhi Yojana (SSY)\nState: National\nCategory: Savings\nSource URL: https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nGovernment small-savings account for the future education and other permitted needs of a girl child.\n\nEligibility: A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.\n\nVerified documents / enrolment records: Sukanya Samriddhi account opening form; Girl child birth certificate; Aadhaar number; PAN or Form 60\n\nEvidence and limitations: The January 2026 PIB note identifies these four account-opening records. Deposits are required and scheme rules govern withdrawals and maturity. Interest rates are notified periodically; no current interest rate is asserted in this dataset. The rules for twin/triplet exceptions require supporting records.",
+            "evidence_kind": "reviewed_paraphrase",
+            "document_note": "Only records verified in the consulted source are listed; completeness is not guaranteed."
+          },
+          "reviewed_at": "2026-11-07T00:00:00",
+          "eligibility": "A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.",
+          "required_documents": [
+            "Sukanya Samriddhi account opening form",
+            "Girl child birth certificate",
+            "Aadhaar number",
+            "PAN or Form 60"
+          ],
+          "evidence_text": "Scheme: Sukanya Samriddhi Yojana (SSY)\nState: National\nCategory: Savings\nSource URL: https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nGovernment small-savings account for the future education and other permitted needs of a girl child.\n\nEligibility: A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.\n\nVerified documents / enrolment records: Sukanya Samriddhi account opening form; Girl child birth certificate; Aadhaar number; PAN or Form 60\n\nEvidence and limitations: The January 2026 PIB note identifies these four account-opening records. Deposits are required and scheme rules govern withdrawals and maturity. Interest rates are notified periodically; no current interest rate is asserted in this dataset. The rules for twin/triplet exceptions require supporting records.",
+          "evidence_kind": "reviewed_paraphrase",
+          "document_note": "Only records verified in the consulted source are listed; completeness is not guaranteed."
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/schemes/ask",
+      "request": {
+        "message": "What documents are required for Sukanya Samriddhi Yojana?"
+      },
+      "status": 200,
+      "body": {
+        "answer": "Lexical retrieval fallback \u2014 embedding service unavailable; matches use stored text terms.\n\nExtractive fallback \u2014 the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n[1] Sukanya Samriddhi Yojana (SSY)\nScheme: Sukanya Samriddhi Yojana (SSY)\nState: National\nCategory: Savings\nSource URL: https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nGovernment small-savings account for the future education and other permitted needs of a girl child.\n\nEligibility: A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.\n\nVerified documents / enrolment records: Sukanya Samriddhi account opening form; Girl child birth certificate; Aadhaar number; PAN or Form 60\n\nEvidence and limitations: The January 2026 PIB note identifies these four account-opening records. Deposits are required and scheme rules govern withdrawals and maturity. Interest rates are notified periodically; no current interest rate is asserted in this dataset. The rules for twin/triplet exceptions require supporting records.",
+        "citations": [
+          {
+            "scheme_id": "8bb35ca0-ed59-5cac-a939-8cbf4830cf03",
+            "chunk_id": "a23d26b7-d77d-54d0-a9e3-bcba1693e007",
+            "title": "Sukanya Samriddhi Yojana (SSY)",
+            "url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44",
+            "excerpt": "Scheme: Sukanya Samriddhi Yojana (SSY)\nState: National\nCategory: Savings\nSource URL: https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nGovernment small-savings account for the future education and other permitted needs of a girl child.\n\nEligibility: A parent or legal guardian may open an account for an Indian girl child before she reaches age 10. Only one account is permitted per girl, normally for up to two girls in a family, with specified twin/triplet exceptions. This account is not an automatic scholarship entitlement.\n\nVerified documents / enrolment records: Sukanya Samriddhi account opening form; Girl child birth certificate; Aadhaar number; PAN or Form 60\n\nEvidence and limitations: The January 2026 PIB note identifies these four account-opening records. Deposits are required and scheme rules govern withdrawals and maturity. Interest rates are notified periodically; no current interest rate is asserted in this dataset. The rules for twin/triplet exceptions require supporting records.",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ],
+        "tool_trace": [
+          {
+            "tool": "lexical_fallback",
+            "status": "ok",
+            "detail": "Retrieved 1 source-linked passages after filtering. Embedding provider unavailable; deterministic lexical ranking of stored evidence was used, not vector similarity."
+          },
+          {
+            "tool": "grounded_generation",
+            "status": "error",
+            "detail": "LLM unavailable; returning explicitly labelled, unmodified related extracts."
+          }
+        ],
+        "mode": "extractive_fallback"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/schemes/ask",
+      "request": {
+        "message": "Tell me about the Galactic Farming Grant, a scheme not in the database."
+      },
+      "status": 200,
+      "body": {
+        "answer": "The stored evidence is insufficient to answer that question. No eligibility, benefit, deadline or application availability can be confirmed. Check the relevant official source or ask about a scheme in the curated collection.",
+        "citations": [],
+        "tool_trace": [
+          {
+            "tool": "lexical_fallback",
+            "status": "ok",
+            "detail": "Retrieved 0 source-linked passages after filtering. Embedding provider unavailable; deterministic lexical ranking of stored evidence was used, not vector similarity."
+          },
+          {
+            "tool": "grounded_generation",
+            "status": "skipped",
+            "detail": "No qualifying evidence; no model generation or factual answer attempted."
+          }
+        ],
+        "mode": "insufficient_evidence"
+      }
+    }
+  ]
+}

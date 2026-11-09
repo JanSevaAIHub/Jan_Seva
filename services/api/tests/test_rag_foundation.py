@@ -242,6 +242,37 @@ def test_ingestion_upserts_rerun_and_provenance(ingestion_db, db_session, monkey
     assert metadata["chunking_version"] and metadata["content_hash"]
 
 
+@pytest.mark.parametrize("change_primary_source", [False, True])
+def test_vector_reuse_refreshes_source_and_keeps_evidence_retrievable(
+        ingestion_db, db_session, monkeypatch, change_primary_source):
+    record = corpus.read_corpus()[0][0]
+    # Two synthetic official URLs in a local-only reviewed note allow a primary
+    # source correction without changing the text or requiring a new embedding.
+    alternate_url = "https://example.gov.in/local-test-reviewed-source"
+    record = record.model_copy(update={"evidence_text": record.evidence_text + "\n\n" + alternate_url})
+    monkeypatch.setattr(ingest_schemes, "embed_texts", lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
+    with db_session.begin():
+        count, _ = ingest_schemes.ingest_record(ingestion_db, record)
+    if change_primary_source:
+        record = record.model_copy(update={"source_url": alternate_url})
+    else:
+        # An unchanged rerun must also repair stale chunk provenance.
+        with db_session.begin():
+            db_session.execute(text("UPDATE scheme_chunks SET source_url=:url"), {"url": alternate_url})
+    before = db_session.execute(text("SELECT id, embedding_vector FROM scheme_chunks ORDER BY id")).all()
+    db_session.commit()
+    monkeypatch.setattr(ingest_schemes, "embed_texts", lambda _: pytest.fail("Unchanged text must reuse its vector"))
+    with db_session.begin():
+        assert ingest_schemes.ingest_record(ingestion_db, record) == (count, 0)
+    after = db_session.execute(text("SELECT id, embedding_vector FROM scheme_chunks ORDER BY id")).all()
+    assert after == before
+    rows = db_session.execute(text("SELECT source_url, source_metadata FROM scheme_chunks WHERE is_current")).all()
+    assert len(rows) == count
+    assert all(row.source_url == json.loads(row.source_metadata)["source_url"] == record.source_url for row in rows)
+    found = retrieval.lexical_retrieve(db_session, record.title)
+    assert found and all(p.scheme_id == record.id and p.source_url == record.source_url for p in found)
+
+
 def test_failed_embedding_rolls_back_without_partial_ingestion(ingestion_db, db_session, monkeypatch):
     record = corpus.read_corpus()[0][0]
     monkeypatch.setattr(ingest_schemes, "embed_texts", lambda _: (_ for _ in ()).throw(ProviderError("Synthetic failure")))
