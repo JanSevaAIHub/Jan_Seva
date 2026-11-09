@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase, authConfigurationError } from '../lib/supabase'
 import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
-import { schemeView, schemeAnswer } from '../lib/schemes'
+import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
+import { agentReply } from '../lib/agent'
 
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
@@ -30,6 +31,48 @@ export function AppProvider({ children }) {
   const [schemeSearchQuery, setSchemeSearchQuery] = useState('')
   const [selectedSectorFilter, setSelectedSectorFilter] = useState('All')
   const [selectedTargetFilter, setSelectedTargetFilter] = useState('All')
+  const [schemeProfile, setSchemeProfile] = useState({})
+  const schemeProfileRef = useRef({})
+  const profileVersion = useRef(0)
+  const eligibilityRequests = useRef(new Set())
+  const [eligibility, setEligibility] = useState({})
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [activeCitation, setActiveCitation] = useState(null)
+
+  const updateSchemeProfile = useCallback(profile => {
+    profileVersion.current += 1
+    schemeProfileRef.current = profile
+    setSchemeProfile(profile)
+    setEligibility({})
+  }, [])
+
+  const clearSchemeProfile = useCallback(() => {
+    updateSchemeProfile({})
+    setProfileEditing(false)
+    setActiveCitation(null)
+    setActiveSchemeModal(null)
+  }, [updateSchemeProfile])
+
+  // Same JSON/auth transport as the rest of the app; public browsing also works.
+  const schemeApiRequest = useCallback((path, options) => sessionToken.current
+    ? apiRequest(path, sessionToken.current, options) : publicApiRequest(path, options), [])
+
+  const checkEligibility = async scheme => {
+    const version = profileVersion.current
+    const requestKey = `${version}:${scheme.id}`
+    if (eligibilityRequests.current.has(requestKey)) return
+    eligibilityRequests.current.add(requestKey)
+    setEligibility(prev => ({ ...prev, [scheme.id]: { loading: true, error: '', result: null } }))
+    try {
+      const reply = await schemeApiRequest('/schemes/eligibility', {
+        method: 'POST', body: { scheme_id: scheme.id, profile: schemeProfileRef.current },
+      })
+      const result = eligibilityResult(reply, scheme)
+      if (version === profileVersion.current) setEligibility(prev => ({ ...prev, [scheme.id]: { loading: false, error: '', result } }))
+    } catch (error) {
+      if (version === profileVersion.current) setEligibility(prev => ({ ...prev, [scheme.id]: { loading: false, error: error.message, result: null } }))
+    } finally { eligibilityRequests.current.delete(requestKey) }
+  }
   
   // Complaints state
   const [complaints, setComplaints] = useState([])
@@ -60,14 +103,33 @@ export function AppProvider({ children }) {
   const schemeChatVersion = useRef(0)
   const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
+  const [agentMessages, setAgentMessages] = useState([])
+  const [agentError, setAgentError] = useState('')
+  const [agentTyping, setAgentTyping] = useState(false)
+  const [agentComplaintDraft, setAgentComplaintDraft] = useState(null)
+  const agentBusy = useRef(false)
+  const agentVersion = useRef(0)
+  const agentSession = useRef(null)
+  const agentMessageId = useRef(0)
+
+  const clearAgentChat = useCallback(() => {
+    agentVersion.current += 1
+    agentBusy.current = false
+    agentSession.current = null
+    setAgentMessages([])
+    setAgentError('')
+    setAgentTyping(false)
+    setAgentComplaintDraft(null)
+  }, [])
 
   const clearSchemeChat = useCallback(() => {
+    clearAgentChat()
     schemeChatVersion.current += 1
     schemeChatBusy.current = false
     setChatMessages([])
     setSchemeChatError('')
     setIsAiTyping(false)
-  }, [])
+  }, [clearAgentChat])
 
   // Add toast notification
   const addToast = (message, type = 'success') => {
@@ -91,6 +153,7 @@ export function AppProvider({ children }) {
 
   const clearAccount = useCallback(() => {
     clearSchemeChat()
+    clearSchemeProfile()
     accountVersion.current += 1
     identityVersion.current += 1
     sessionUser.current = null
@@ -108,7 +171,7 @@ export function AppProvider({ children }) {
     setToasts([])
     setAuthLoading(false)
     setComplaintsLoading(false)
-  }, [clearSchemeChat])
+  }, [clearSchemeChat, clearSchemeProfile])
 
   useEffect(() => onUnauthorized(failedToken => {
     if (failedToken !== sessionToken.current) return
@@ -134,6 +197,7 @@ export function AppProvider({ children }) {
       if (sessionUser.current !== nextSession?.user.id) {
         identityVersion.current += 1
         clearSchemeChat()
+        clearSchemeProfile()
         sessionUser.current = nextSession?.user.id || null
         setCurrentUser(GUEST)
         setComplaints([])
@@ -152,7 +216,7 @@ export function AppProvider({ children }) {
       if (!nextSession) setComplaintsLoading(false)
     })
     return () => subscription.unsubscribe()
-  }, [clearSchemeChat])
+  }, [clearSchemeChat, clearSchemeProfile])
 
   const applyComplaint = saved => {
     const ticket = complaintView(saved)
@@ -272,16 +336,23 @@ export function AppProvider({ children }) {
 
   const handleRouteAction = () => addToast('Department routing is not available in this phase.', 'info')
 
+  const invalidateSchemeSearch = useCallback((loading = false) => {
+    schemeRequest.current += 1
+    setSchemes([])
+    setSchemesError('')
+    setSchemesLoading(loading)
+  }, [])
+
   const loadSchemes = useCallback(async ({ query = '', state = '', category = '' } = {}) => {
     const request = ++schemeRequest.current
     setSchemesLoading(true)
     setSchemesError('')
     try {
-      const params = new URLSearchParams({ limit: '10' })
+      const params = new URLSearchParams({ limit: '50' })
       if (query.trim()) params.set('query', query.trim())
       if (state && state !== 'All') params.set('state', state)
       if (category && category !== 'All') params.set('category', category)
-      const records = await publicApiRequest(`/schemes?${params}`)
+      const records = await schemeApiRequest(`/schemes?${params}`)
       if (!Array.isArray(records)) throw new Error('The scheme service returned an invalid list. Please retry.')
       if (request === schemeRequest.current) setSchemes(records.map(schemeView))
     } catch (error) {
@@ -289,7 +360,7 @@ export function AppProvider({ children }) {
     } finally {
       if (request === schemeRequest.current) setSchemesLoading(false)
     }
-  }, [])
+  }, [schemeApiRequest])
 
   const sendChatMessage = async (userText, category = '') => {
     if (!userText.trim() || schemeChatBusy.current) return false
@@ -301,8 +372,8 @@ export function AppProvider({ children }) {
     setChatMessages(prev => [...prev, { id: `u-${now}`, sender: 'user', text: userText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     try {
-      const profile = { ...(selectedState !== 'All' ? { state: selectedState } : {}), ...(currentUser.occupation ? { occupation: currentUser.occupation } : {}) }
-      const reply = schemeAnswer(await publicApiRequest('/schemes/ask', {
+      const profile = { ...(schemeProfile.state || selectedState !== 'All' ? { state: schemeProfile.state || selectedState } : {}), ...(schemeProfile.occupation ? { occupation: schemeProfile.occupation } : {}) }
+      const reply = schemeAnswer(await schemeApiRequest('/schemes/ask', {
         method: 'POST', body: JSON.stringify({ message: userText, profile,
           ...(category && category !== 'All' ? { category } : {}) }),
       }))
@@ -316,6 +387,29 @@ export function AppProvider({ children }) {
       return false
     } finally {
       if (version === schemeChatVersion.current) { schemeChatBusy.current = false; setIsAiTyping(false) }
+    }
+  }
+
+  const sendAgentMessage = async message => {
+    if (agentBusy.current || message.trim().length < 3) return false
+    agentBusy.current = true
+    const version = agentVersion.current, id = ++agentMessageId.current
+    setAgentTyping(true)
+    setAgentError('')
+    setAgentMessages(prev => [...prev, { id: `agent-u-${id}`, sender: 'user', text: message }])
+    try {
+      const reply = agentReply(await schemeApiRequest('/agent/message', { method: 'POST', timeoutMs: 160000,
+        body: { message, ...(agentSession.current ? { session_id: agentSession.current } : {}),
+          ...(Object.keys(schemeProfileRef.current).length ? { profile: schemeProfileRef.current } : {}) } }))
+      if (version !== agentVersion.current) return false
+      agentSession.current = reply.session_id
+      setAgentMessages(prev => [...prev, { id: `agent-a-${id}`, sender: 'assistant', text: reply.response, ...reply }])
+      return true
+    } catch (error) {
+      if (version === agentVersion.current) setAgentError(error.message)
+      return false
+    } finally {
+      if (version === agentVersion.current) { agentBusy.current = false; setAgentTyping(false) }
     }
   }
 
@@ -361,6 +455,8 @@ export function AppProvider({ children }) {
         selectedState,
         setSelectedState,
         schemes, schemesLoading, schemesError, schemeChatError, loadSchemes,
+        invalidateSchemeSearch, schemeProfile, updateSchemeProfile, eligibility, checkEligibility,
+        profileEditing, setProfileEditing, activeCitation, setActiveCitation,
         savedSchemeIds,
         toggleSaveScheme,
         activeSchemeModal,
@@ -391,7 +487,8 @@ export function AppProvider({ children }) {
         removeToast,
         chatMessages,
         sendChatMessage,
-        isAiTyping
+        isAiTyping,
+        agentMessages, agentError, agentTyping, sendAgentMessage, agentComplaintDraft, setAgentComplaintDraft
       }}
     >
       {children}

@@ -10,24 +10,34 @@ import os
 import secrets
 from tempfile import TemporaryDirectory
 from time import time
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import jwt
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session
 import uvicorn
 
 os.environ["SUPABASE_URL"] = "http://127.0.0.1:8765"
 os.environ["CORS_ORIGINS"] = "http://127.0.0.1:5174"
+os.environ["EMBEDDING_MODEL"] = "isolated-e2e-no-network"
+os.environ["EMBEDDING_DIMENSIONS"] = "3"
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["LLM_MODEL"] = ""
 
 from app.db import Base, get_db
 from app.main import app
-from app.models import CORE_TABLES, Profile, Role, Scheme
-from app.ai.corpus import read_corpus
+from app.models import CORE_TABLES, Profile, Role, Scheme, SchemeChunk
+from app.ai.corpus import CHUNKING_VERSION, CORPUS, chunk_evidence, content_hash, read_corpus
+from app.ai import retrieval
+
+# Explicit TEST DOUBLE: bypass only the PostgreSQL catalog guard in isolated
+# SQLite. With no provider key, the real retrieve() uses real stored-text lexical
+# fallback. No fake embeddings, generated answers or synthetic schemes are used.
+retrieval.prepare_vectors = lambda _db: None
 
 # The fake Auth endpoints also receive Supabase SDK headers (apikey, client info).
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5174"],
@@ -55,15 +65,23 @@ async def lifespan(_app):
             connection.execute("PRAGMA foreign_keys=ON")
 
         Base.metadata.create_all(engine, tables=CORE_TABLES)
+        with engine.begin() as db:
+            db.execute(text("ALTER TABLE scheme_chunks ADD COLUMN is_current BOOLEAN NOT NULL DEFAULT true"))
+            db.execute(text("ALTER TABLE scheme_chunks ADD COLUMN source_metadata JSON NOT NULL DEFAULT '{}'"))
         with Session(engine) as db:
             db.add_all([Profile(user_id=UUID(user["id"]), name=user["name"], role=user["role"]) for user in identities.values()])
-            # Real reviewed records in the isolated DB exercise the real listing
-            # route. No fake embeddings or vector-retrieval override are installed.
+            # Real reviewed schemes and chunks exercise listing, lexical fallback,
+            # eligibility and citations through actual API routes and SQLite rows.
             records, failures = read_corpus()
             assert not failures
             db.add_all([Scheme(id=r.id, title=r.title, category=r.category, state=r.state,
                 description=r.description, source_url=r.source_url, rules_json=r.rules(),
                 reviewed_at=r.reviewed_at) for r in records])
+            db.flush()
+            for record in records:
+                db.add_all([SchemeChunk(id=uuid5(record.id, f"{CORPUS}:{CHUNKING_VERSION}:{content_hash(chunk)}"),
+                    scheme_id=record.id, chunk_text=chunk, source_url=record.source_url)
+                    for chunk in chunk_evidence(record.evidence_text)])
             db.commit()
 
         def database():

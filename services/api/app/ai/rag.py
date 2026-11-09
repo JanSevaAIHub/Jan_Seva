@@ -1,10 +1,30 @@
 """Evidence-only answers: the LLM selects paragraphs; it cannot write unchecked facts."""
 
+import re
+
 from app.ai.corpus import official_url
 from app.ai.provider import ProviderError, select_evidence
 from app.ai.retrieval import retrieve
 from app.ai.scheme_schemas import Citation, SchemeAnswer, SchemeAsk, ToolTrace
 from app.config import ConfigurationError
+
+
+# Conservative quarantine for common source-injection markers. This complements
+# data-only prompts and exact excerpt validation; it is not a complete detector.
+INSTRUCTION_MARKERS = re.compile(
+    r"ignore\b.{0,60}\binstructions\b|<\|(?:im_start|system|assistant)\|>|"
+    r"(?:^|\n)\s*(?:system|developer|assistant)\s*:|\[/?INST\]|"
+    r"reveal\b.{0,50}\b(?:api[ -]?key|secret|system prompt)\b", re.IGNORECASE)
+
+
+def render_evidence_answer(citations, mode, lexical=False):
+    if mode == "extractive_fallback":
+        notice = "Extractive fallback — the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n"
+    else:
+        notice = "Relevant passages from reviewed official-source summaries follow. These are not an eligibility decision; omitted conditions and current availability must be checked with the administering authority.\n\n"
+    if lexical:
+        notice = "Lexical retrieval fallback — embedding service unavailable; matches use stored text terms.\n\n" + notice
+    return notice + "\n\n".join(f"[{i + 1}] {c.title}\n{c.excerpt}" for i, c in enumerate(citations))
 
 
 def citation(passage, excerpt):
@@ -20,7 +40,13 @@ def insufficient(trace):
 def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
     state = request.state or (request.profile.state if request.profile else None)
     passages = retrieve(db, request.message, state, request.category, limit=5)
-    trace = [ToolTrace(tool="pgvector_cosine_retrieval", status="ok", detail=f"Retrieved {len(passages)} source-linked passages after state/category/model/score filtering.")]
+    method = getattr(passages, "method", "pgvector_cosine_retrieval")
+    trace = [ToolTrace(tool=method, status="ok", detail=f"Retrieved {len(passages)} source-linked passages after filtering." +
+        (" Embedding provider unavailable; deterministic lexical ranking of stored evidence was used, not vector similarity." if method == "lexical_fallback" else " Vector model/dimension/score filtering applied."))]
+    rejected_sources = sum(not official_url(p.source_url) or bool(INSTRUCTION_MARKERS.search(p.text)) for p in passages)
+    passages = [p for p in passages if official_url(p.source_url) and not INSTRUCTION_MARKERS.search(p.text)]
+    if rejected_sources:
+        trace.append(ToolTrace(tool="source_safety", status="skipped", detail=f"Quarantined {rejected_sources} unsafe source passages; excluded from generation and extractive fallback."))
     if not passages:
         trace.append(ToolTrace(tool="grounded_generation", status="skipped", detail="No qualifying evidence; no model generation or factual answer attempted."))
         return insufficient(trace)
@@ -31,8 +57,7 @@ def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
         trace.append(ToolTrace(tool="grounded_generation", status="error", detail="LLM unavailable; returning explicitly labelled, unmodified related extracts."))
         related = passages[:3]
         citations = [citation(p, p.text) for p in related]
-        answer = "Extractive fallback — the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n"
-        answer += "\n\n".join(f"[{i + 1}] {p.title}\n{p.text}" for i, p in enumerate(related))
+        answer = render_evidence_answer(citations, "extractive_fallback", method == "lexical_fallback")
         return SchemeAnswer(answer=answer, citations=citations, tool_trace=trace, mode="extractive_fallback")
     known = {str(p.chunk_id): p for p in passages}
     citations, used = [], set()
@@ -63,6 +88,5 @@ def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
     trace.append(ToolTrace(tool="citation_validation", status="ok", detail=f"Accepted {len(citations)} stored paragraphs; removed {rejected} unsupported citations/selections."))
     if not citations:
         return insufficient(trace)
-    answer = "Relevant passages from reviewed official-source summaries follow. These are not an eligibility decision; omitted conditions and current availability must be checked with the administering authority.\n\n"
-    answer += "\n\n".join(f"[{i + 1}] {c.title}\n{c.excerpt}" for i, c in enumerate(citations))
+    answer = render_evidence_answer(citations, "grounded_extracts", method == "lexical_fallback")
     return SchemeAnswer(answer=answer, citations=citations, tool_trace=trace, mode="grounded_extracts")

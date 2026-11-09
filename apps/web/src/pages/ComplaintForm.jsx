@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
+import { CATEGORY_LABELS } from '../lib/complaints'
 
 const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
 
@@ -29,7 +30,7 @@ export function ComplaintForm() {
     complaints,
     setReviewModalComplaint,
     setPackageModalComplaint,
-    addToast
+    addToast, agentComplaintDraft, setAgentComplaintDraft
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
@@ -44,6 +45,17 @@ export function ComplaintForm() {
   const [priority, setPriority] = useState('Medium')
   const [hasPhoto, setHasPhoto] = useState(false)
   const [aiDetected, setAiDetected] = useState(false)
+
+  // Read-only assistant proposal. Editing/navigating never submits a complaint.
+  useEffect(() => {
+    if (!agentComplaintDraft) return
+    setTitle(agentComplaintDraft.title || '')
+    setDescription(agentComplaintDraft.description)
+    setLocality(agentComplaintDraft.locality || '')
+    setCategory(CATEGORY_LABELS[agentComplaintDraft.category] || 'Other')
+    setAiDetected(false)
+    setAgentComplaintDraft(null)
+  }, [agentComplaintDraft, setAgentComplaintDraft])
 
   // Auto-detect category from title typing
   const handleTitleChange = (val) => {
@@ -261,13 +273,13 @@ export function ComplaintForm() {
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Description *
               </label>
-              <span className="text-[10px] text-slate-400">{description.length}/500</span>
+              <span className="text-[10px] text-slate-400">{description.length}/5000</span>
             </div>
             <textarea
               rows={4}
               minLength={10}
               required
-              maxLength={500}
+              maxLength={5000}
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Describe what happened, exact location landmark, and when it started..."
