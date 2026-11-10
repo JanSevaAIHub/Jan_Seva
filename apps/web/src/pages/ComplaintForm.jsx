@@ -19,6 +19,7 @@ import {
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 import { CATEGORY_LABELS } from '../lib/complaints'
+import { publicApiRequest } from '../lib/api'
 
 const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
 
@@ -45,6 +46,45 @@ export function ComplaintForm() {
   const [priority, setPriority] = useState('Medium')
   const [hasPhoto, setHasPhoto] = useState(false)
   const [aiDetected, setAiDetected] = useState(false)
+  const [duplicateMatches, setDuplicateMatches] = useState([])
+  const [suggestedDept, setSuggestedDept] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+
+  // Asynchronous duplicate and department analysis
+  useEffect(() => {
+    if (title.trim().length < 3 || description.trim().length < 5) {
+      setDuplicateMatches([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setAnalyzing(true)
+      try {
+        const res = await publicApiRequest('/complaints/analyze', {
+          method: 'POST',
+          body: {
+            title: title.trim(),
+            description: description.trim(),
+            locality: locality.trim() || undefined,
+          },
+        })
+        if (res?.category && !aiDetected) {
+          setCategory(CATEGORY_LABELS[res.category] || 'Other')
+          setAiDetected(true)
+        }
+        if (res?.department) {
+          setSuggestedDept(res.department)
+        }
+        if (Array.isArray(res?.duplicates)) {
+          setDuplicateMatches(res.duplicates)
+        }
+      } catch {
+        // Retain existing form values on network/server error
+      } finally {
+        setAnalyzing(false)
+      }
+    }, 450)
+    return () => clearTimeout(timer)
+  }, [title, description, locality, aiDetected])
 
   // Read-only assistant proposal. Editing/navigating never submits a complaint.
   useEffect(() => {
@@ -404,12 +444,34 @@ export function ComplaintForm() {
           </div>
 
           {/* Similar Complaints (AI Suggestion Alert) */}
-          <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
-            <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
-            <div className="text-xs text-indigo-950 leading-relaxed">
-              <strong>Similar Complaints:</strong> Duplicate detection is not enabled in this phase.
+          {duplicateMatches.length > 0 ? (
+            <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                <AlertCircle size={16} className="text-amber-600 flex-none" />
+                <span>May be related to existing grievances in {locality || 'your area'}:</span>
+              </div>
+              <div className="space-y-1.5 pl-6">
+                {duplicateMatches.map(dup => (
+                  <div key={dup.id} className="text-xs text-amber-950 bg-white/90 p-2 rounded-lg border border-amber-200/60 flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold">{dup.title}</span>
+                      <span className="text-[11px] text-slate-500 ml-2">({dup.locality} • {dup.status.replace('_', ' ')})</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      {Math.round(dup.similarity_score * 100)}% match
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
+              <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
+              <div className="text-xs text-indigo-950 leading-relaxed">
+                <strong>AI Assistant:</strong> {analyzing ? 'Analyzing grievance and checking for duplicates...' : (suggestedDept ? `Recommended department: ${suggestedDept}. No duplicate grievances found.` : 'Category auto-detection and duplicate checks active.')}
+              </div>
+            </div>
+          )}
 
           <p className="text-[11px] text-slate-500">Draft storage is unavailable. Your values stay in this form for review or retry; refreshing clears unsaved values.</p>
           {/* Action Buttons */}

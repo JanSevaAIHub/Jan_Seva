@@ -90,3 +90,29 @@ class ComplaintStatusUpdate(APIModel):
 class OfficialReferenceUpdate(APIModel):
     official_ref: str = Field(min_length=1, max_length=250)
 
+
+class DuplicateComplaintMatch(APIModel):
+    id: UUID
+    title: str
+    locality: str
+    category: ComplaintCategory
+    status: InternalStatus
+    similarity_score: float
+    created_at: datetime
+
+
+class ComplaintAnalyzeRequest(APIModel):
+    title: str = Field(min_length=2, max_length=250)
+    description: str = Field(min_length=5, max_length=5000)
+    locality: str | None = Field(default=None, max_length=250)
+
+
+class ComplaintAnalyzeResponse(APIModel):
+    category: ComplaintCategory
+    department: str
+    confidence: float
+    urgency_level: Literal["Low", "Medium", "High"]
+    duplicates: list[DuplicateComplaintMatch] = Field(default_factory=list)
+    mode: str = "keyword_fallback"
+
+
