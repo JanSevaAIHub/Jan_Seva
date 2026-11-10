@@ -2,7 +2,7 @@
 
 Base path: `/api`. JSON requests and responses. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
 
-Registered routes include `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`. Phase 3 adds `POST /agent/message`. Complaint analysis remains unimplemented and is reported as an unavailable capability. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
+Registered routes include `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `POST /complaints/analyze`, `GET /officer/complaints`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`. Phase 3 adds `POST /agent/message`. Complaint analysis is fully operational with bilingual category classification, suggested department routing, urgency estimation, and duplicate detection. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
 
 `ComplaintCreate` accepts only `{title, description, category, locality}`. A citizen's verified identity supplies ownership; the create response is 201 with `ComplaintDetail`. List returns `ComplaintDetail[]` including events for the existing list timelines, scoped to citizen ownership or officer assignment; `?status=` optionally filters. Officer PATCH accepts `{status, note?}` and advances exactly one step: `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Invalid transitions return 409. Update and audit event commit atomically. Notes may be omitted, in which case the server records a default note.
 
@@ -17,10 +17,11 @@ The owner-only reference route accepts `{official_ref}` and returns `ComplaintDe
 | GET | `/schemes?query=&state=&category=&limit=` | optional filters | database `SchemeCard[]`; vector query when provided |
 | POST | `/schemes/ask` | `{ "message": string, "profile"?: {state?, occupation?}, "state"?: string, "category"?: string }` | `{ "answer": string, "citations": SchemeCitation[], "tool_trace": ToolTrace[], "mode": string }` |
 | POST | `/schemes/eligibility` | `{ "scheme_id": UUID, "profile": EligibilityProfile }` | `{ "scheme_id": UUID, "status": EligibilityStatus, "matched_rules": string[], "missing_fields": string[], "reasons": string[], "citations": EligibilityCitation[] }` |
-| POST | `/complaints/analyze` | Proposed; not implemented: `{ "title": string, "description": string, "locality": string }` | Planned analysis contract only; agent reports unavailable |
+| POST | `/complaints/analyze` | `{ "title": string, "description": string, "locality"?: string }` | `{ "category": ComplaintCategory, "department": string, "confidence": float, "urgency": string, "mode": string, "suggested_department": string, "duplicates": DuplicateMatch[] }` |
 | POST | `/complaints` | confirmed `ComplaintCreate` | 201 `ComplaintDetail` with `LOCAL_SUBMITTED` internal status |
-| GET | `/complaints?status=` | authenticated + ownership/assignment scope | `ComplaintDetail[]` |
+| GET | `/complaints?status=&category=&locality=` | authenticated + ownership scope | `ComplaintDetail[]` |
 | GET | `/complaints/{id}` | authenticated + owner/officer check | `ComplaintDetail` including internal events |
+| GET | `/officer/complaints?status=&category=&locality=` | authenticated officer only | filtered department/assigned `ComplaintDetail[]` |
 | PATCH | `/officer/complaints/{id}` | assigned officer only: `{ "status": InternalStatus, "note"?: string }` | updated `ComplaintDetail`; append audit event |
 | PATCH | `/complaints/{id}/official-ref` | citizen owner: `{ "official_ref": string }` | `ComplaintDetail`; internal status unchanged |
 | POST | `/agent/message` | `{ "message": string, "session_id"?: UUID, "profile"?: EligibilityProfile, "scheme_id"?: UUID, "complaint"?: ComplaintDraft }` | `{ "session_id": UUID, "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "status": AgentStatus, "citations": Citation[], "actions": AgentAction[], "tool_trace": ToolTrace[], "eligibility": EligibilityResult[] }` |

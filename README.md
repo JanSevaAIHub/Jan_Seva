@@ -6,7 +6,7 @@ An independent citizen-assistance portfolio project: discover public schemes wit
 
 Phase 2 Scheme Navigator update (2026-11-09): the existing discovery screen now supports a tab-local editable profile, deterministic eligibility checks with exact values or ranges, source-evidence drawers, and search/filter/retry flows. Local integration is verified with isolated stored data; hosted services remain unverified. See [the Phase 2 report](docs/developer-a-phase-2-ui.md).
 
-Phase 3 update (2026-11-09): the homepage now calls one read-only LangGraph agent. Scheme, complaint, mixed and ambiguous routing, evidence checks, deterministic eligibility and confirmation-only draft transfer are locally tested. Complaint analysis remains unavailable; hosted integrations are unverified, so Day 1 status is **PARTIAL**. See [Developer A handoff](docs/dev-a-day1-handoff.md).
+Phase 4 & 5 update (2026-11-10): complete citizen-to-officer complaint lifecycle, officer queue filtering (`status`, `category`, `locality`), AI complaint classification with bilingual keyword fallback, duplicate grievance detection, live dashboard analytics, formal QA benchmarks (15 classification cases, 10 duplicate pairs, 8 RBAC matrix checks), and cloud deployment manifests (Render, Railway, Vercel, Netlify) are fully implemented and verified. See [Phase 2 QA report](docs/phase-3-evaluation-report.md) and [Production Deployment Guide](docs/production-deployment.md).
 
 ## Technology and architecture
 
@@ -110,10 +110,12 @@ Open `http://127.0.0.1:5173`; API docs: `http://127.0.0.1:8000/docs`. `/api/heal
 | `POST /api/schemes/ask` | Retrieved, validated evidence answer and citations |
 | `POST /api/schemes/eligibility` | Deterministic stored-rule assessment with reasons, missing fields and sources |
 | `POST /api/agent/message` | Single LangGraph assistant, verified scheme evidence and confirmation-only complaint proposals |
+| `POST /api/complaints/analyze` | AI category classification, department suggestion, urgency & duplicate detection |
 | `POST /api/complaints` | Citizen creates complaint and initial event atomically |
-| `GET /api/complaints` | Own citizen tickets or assigned officer queue; optional status |
+| `GET /api/complaints` | Own citizen tickets with status, category, and locality filters |
 | `GET /api/complaints/{id}` | Authorized detail and audit history |
-| `PATCH /api/officer/complaints/{id}` | Assigned officer advances one internal step |
+| `GET /api/officer/complaints` | Filtered officer complaint queue with status, category, and locality query parameters |
+| `PATCH /api/officer/complaints/{id}` | Assigned officer advances one internal step with audit logging |
 | `PATCH /api/complaints/{id}/official-ref` | Owner records an explicitly unverified official reference |
 
 See [API contract](docs/api-contract.md). Complaint edit/delete and government submission are not implemented.
@@ -139,7 +141,7 @@ npm.cmd --prefix apps/web run test:e2e
 npm.cmd --prefix apps/web run build
 ```
 
-Stabilization results: **134 backend passed, 1 live test skipped; 11 client passed; 21 Chromium browser passed; default and Auth-configured builds passed; npm audit 0 reported vulnerabilities.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. Scheme answer/navigation fixtures check UI contracts, not live model quality or external page availability. See the [stabilization report](docs/stabilization-report.md) for fixes, commands and remaining gates. Historical release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
+Verified test results: **281 backend passed, 1 live test skipped; 41 client unit tests passed; 45 Playwright Chromium browser tests passed across all 7 test suites; production build transformed 1647 modules in 1.01s with 0 errors.** Empirical QA evaluation: **100% complaint classification accuracy across 15 cases; 100% precision, recall & F1 duplicate detection across 10 scenarios; 8/8 RBAC security checks passed; sub-2ms health check p50 latency.** Browser tests use real isolated FastAPI/SQLite and a local signed-token Auth double. See the [Phase 2 QA report](docs/phase-3-evaluation-report.md) and [Production Deployment Guide](docs/production-deployment.md). Historical release-run screenshots: [mobile home](docs/screenshots/mobile-home.png), [officer audit with synthetic data](docs/screenshots/mobile-officer-audit.png).
 
 After setup, sign in as Arjun, load schemes, ask a question and open its official citation. Submit a complaint, retain the returned UUID, check My Requests and refresh. In a separate browser profile, sign in as R. Singh, open the assigned UUID and advance its status with a note. Refresh Arjun's tracking page and confirm persistent status/history. Then run the live gate:
 
