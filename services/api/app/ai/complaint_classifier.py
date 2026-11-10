@@ -74,9 +74,36 @@ STOPWORDS = {
 }
 
 
+def _stem(w: str) -> str:
+    for s in ["ing", "age", "ed", "es", "s"]:
+        if w.endswith(s) and len(w) > len(s) + 2:
+            return w[:-len(s)]
+    return w
+
+
 def _tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z0-9]{3,}", text.lower())
-    return {w for w in words if w not in STOPWORDS}
+    return {_stem(w) for w in words if w not in STOPWORDS}
+
+
+def _check_locality(loc1: str, loc2: str) -> float:
+    if not loc1 or not loc2:
+        return 0.5  # Neutral if one is missing
+    l1 = loc1.lower().strip()
+    l2 = loc2.lower().strip()
+    if l1 == l2:
+        return 1.0
+    nums1 = set(re.findall(r"\d+", l1))
+    nums2 = set(re.findall(r"\d+", l2))
+    if nums1 and nums2 and nums1 != nums2:
+        return 0.0  # Explicitly different sectors/wards/blocks
+    toks1 = _tokenize(l1) - {"sector", "ward", "block", "phase", "colony", "nagar", "road"}
+    toks2 = _tokenize(l2) - {"sector", "ward", "block", "phase", "colony", "nagar", "road"}
+    if toks1 and toks2:
+        return 1.0 if (toks1 & toks2) else 0.0
+    if nums1 and nums2 and nums1 == nums2:
+        return 1.0
+    return 0.0
 
 
 def classify_text(text: str) -> tuple[ComplaintCategory, str, float, str, str]:
@@ -124,7 +151,7 @@ def find_duplicates(
     Calculates semantic & textual similarity to find existing related/duplicate tickets.
     """
     target_title_tokens = _tokenize(title)
-    target_desc_tokens = _tokenize(description)
+    target_all_tokens = _tokenize(f"{title} {description}")
     target_loc_clean = locality.lower().strip() if locality else ""
 
     # Fetch recent active complaints matching category
@@ -146,34 +173,25 @@ def find_duplicates(
     matches: list[DuplicateComplaintMatch] = []
     for cand in candidates:
         cand_title_tokens = _tokenize(cand.title)
-        cand_desc_tokens = _tokenize(cand.description)
-        cand_loc_clean = cand.locality.lower().strip() if cand.locality else ""
+        cand_all_tokens = _tokenize(f"{cand.title} {cand.description}")
 
         # Title similarity (Jaccard)
         t_union = len(target_title_tokens | cand_title_tokens)
         title_sim = (len(target_title_tokens & cand_title_tokens) / t_union) if t_union else 0.0
 
-        # Description similarity (Jaccard)
-        d_union = len(target_desc_tokens | cand_desc_tokens)
-        desc_sim = (len(target_desc_tokens & cand_desc_tokens) / d_union) if d_union else 0.0
+        # All content similarity (title + description)
+        a_union = len(target_all_tokens | cand_all_tokens)
+        all_sim = (len(target_all_tokens & cand_all_tokens) / a_union) if a_union else 0.0
 
         # Locality match
-        loc_match = 0.0
-        if target_loc_clean and cand_loc_clean:
-            if target_loc_clean == cand_loc_clean or target_loc_clean in cand_loc_clean or cand_loc_clean in target_loc_clean:
-                loc_match = 1.0
-            else:
-                loc_tokens = _tokenize(target_loc_clean) & _tokenize(cand_loc_clean)
-                if loc_tokens:
-                    loc_match = 0.7
+        loc_match = _check_locality(target_loc_clean, cand.locality or "")
 
         # Composite similarity score
-        # Locality match is crucial for civic grievances
-        similarity = (title_sim * 0.45) + (desc_sim * 0.25) + (loc_match * 0.30)
-
-        # High title overlap even without locality is significant
-        if title_sim >= 0.65:
-            similarity = max(similarity, title_sim * 0.9)
+        # Different localities cannot be duplicates of civic issues
+        if target_loc_clean and cand.locality and loc_match == 0.0:
+            similarity = min(all_sim * 0.40, 0.40)
+        else:
+            similarity = (title_sim * 0.25) + (all_sim * 0.40) + (loc_match * 0.35)
 
         if similarity >= 0.50:
             matches.append(
