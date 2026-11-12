@@ -1,12 +1,12 @@
 """Five core models. Supabase owns auth.users; the application never creates it."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 import math
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey,
+    Boolean, CheckConstraint, Column, Date, DateTime, Enum, ForeignKey,
     ForeignKeyConstraint, Integer, JSON, String, Table, Text, Uuid, func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -127,7 +127,11 @@ class SchemeChunk(Base):
 
 class Complaint(Base):
     __tablename__ = "complaints"
-    __table_args__ = (CheckConstraint("length(trim(title)) > 0", name="complaints_title_nonempty"),)
+    __table_args__ = (
+        CheckConstraint("length(trim(title)) > 0", name="complaints_title_nonempty"),
+        CheckConstraint("official_channel IS NULL OR official_channel IN ('CPGRAMS', 'CONNECT_PUNJAB', 'OTHER_OFFICIAL')", name="complaints_official_channel"),
+        CheckConstraint("official_ref IS NOT NULL OR (official_channel IS NULL AND official_submitted_on IS NULL)", name="complaints_filing_requires_reference"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="RESTRICT"), index=True)
@@ -138,6 +142,8 @@ class Complaint(Base):
     status: Mapped[InternalStatus] = mapped_column(enum_type(InternalStatus, "complaints_status"), default=InternalStatus.LOCAL_SUBMITTED, server_default="LOCAL_SUBMITTED", index=True)
     assigned_officer_id: Mapped[UUID | None] = mapped_column(ForeignKey("profiles.user_id", ondelete="SET NULL"), index=True)
     official_ref: Mapped[str | None] = mapped_column(String(250))
+    official_channel: Mapped[str | None] = mapped_column(String(30))
+    official_submitted_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

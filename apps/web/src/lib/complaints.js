@@ -22,6 +22,7 @@ export function complaintView(record) {
   return {
     ...record, categoryCode: record.category, category: CATEGORY_LABELS[record.category] || record.category,
     officialRef: record.official_ref, officialStatus: record.official_status,
+    officialChannel: record.official_channel || '', officialSubmittedOn: record.official_submitted_on || '',
     submittedAt: new Date(record.created_at).toLocaleString(),
     priority: 'Not assessed', department: record.assigned_officer_id ? 'Assigned officer' : 'Awaiting assignment',
     expectedResolution: 'Not estimated', officerNotes: events.filter(e => e.old_status !== null && e.old_status !== e.new_status).at(-1)?.note,

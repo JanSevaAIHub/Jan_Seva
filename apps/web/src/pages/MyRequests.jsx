@@ -17,7 +17,7 @@ import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 export function MyRequests() {
-  const { complaints, refreshComplaints, setPackageModalComplaint } = useApp()
+  const { complaints, complaintsLoading, complaintsError, refreshComplaints, setPackageModalComplaint } = useApp()
   useEffect(() => { refreshComplaints() }, [])
   const [statusFilter, setStatusFilter] = useState('ALL')
 
@@ -38,7 +38,7 @@ export function MyRequests() {
             <span className="font-semibold text-slate-800">My Requests</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            My Civic Grievance Requests
+            My Complaints
           </h1>
           <p className="text-xs text-slate-500">
             Follow JanSeva internal status updates, audit history, and official filing packages.
@@ -116,6 +116,7 @@ export function MyRequests() {
                 <Link to={`/track?id=${item.id}`} className="text-base font-bold text-slate-900 hover:text-violet-700">{item.title}</Link>
                 <Link to={`/track?id=${item.id}`} className="block text-xs font-bold text-violet-700">View details &amp; audit history</Link>
                 <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
+                <p className="text-xs text-slate-500">Category: {item.category} | Government filing: {item.officialStatus === 'USER_REPORTED_FILED' ? 'User-reported filed (unverified)' : 'Not filed'}</p>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <MapPin size={13} className="text-slate-400 flex-none" />
                   <span>{item.locality}</span>
@@ -165,7 +166,7 @@ export function MyRequests() {
           </div>
         ))}
 
-        {filteredComplaints.length === 0 && (
+        {filteredComplaints.length === 0 && !complaintsLoading && !complaintsError && (
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs space-y-3">
             <ClipboardList size={32} className="mx-auto text-slate-400" />
             <div className="font-bold text-slate-800">No requests found</div>

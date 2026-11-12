@@ -4,6 +4,7 @@ import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
 import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
 import { agentReply } from '../lib/agent'
+import { createCitizenAccount, sendResetEmail, changePassword, friendlyAuthError } from '../lib/auth'
 
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
@@ -16,6 +17,7 @@ export function AppProvider({ children }) {
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState('')
   const [loginRole, setLoginRole] = useState(null)
+  const [authMode, setAuthMode] = useState('login')
   const accountVersion = useRef(0)
   const identityVersion = useRef(0)
   const listVersion = useRef(0)
@@ -189,7 +191,8 @@ export function AppProvider({ children }) {
   // The auth subscription only updates React state; API calls run outside its lock.
   useEffect(() => {
     if (!supabase) return
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') { setAuthMode('reset'); setLoginRole('citizen') }
       const token = nextSession?.access_token || null
       if (sessionToken.current === token) return
       sessionToken.current = token
@@ -323,10 +326,10 @@ export function AppProvider({ children }) {
     return ticket
   }
 
-  const saveOfficialReference = async (id, officialRef) => {
+  const saveOfficialReference = async (id, officialRef, metadata = {}) => {
     const version = identityVersion.current
     const saved = await apiRequest(`/complaints/${id}/official-ref`, session?.access_token, {
-      method: 'PATCH', body: JSON.stringify({ official_ref: officialRef }),
+      method: 'PATCH', body: JSON.stringify({ official_ref: officialRef, ...metadata }),
     })
     if (version !== identityVersion.current) throw new Error('The account changed. Please reopen the ticket.')
     applyComplaint(saved)
@@ -414,7 +417,7 @@ export function AppProvider({ children }) {
   }
 
   // Selecting a persona opens sign-in. Only /api/me establishes its role.
-  const switchUserRole = newRole => { setAuthError(''); setLoginRole(newRole) }
+  const switchUserRole = newRole => { setAuthError(''); setAuthMode('login'); setLoginRole(newRole) }
   const signIn = async (email, password) => {
     setAuthBusy(true)
     setAuthError('')
@@ -423,9 +426,22 @@ export function AppProvider({ children }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       return true
-    } catch (error) { setAuthError(error.message); return false }
+    } catch (error) { setAuthError(friendlyAuthError(error)); return false }
     finally { setAuthBusy(false) }
   }
+  const runAuthAction = async action => {
+    if (authBusy) return null
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      if (!supabase) throw new Error(authConfigurationError)
+      return await action()
+    } catch (error) { setAuthError(friendlyAuthError(error)); return null }
+    finally { setAuthBusy(false) }
+  }
+  const signUp = (email, password) => runAuthAction(() => createCitizenAccount(supabase, email, password, window.location.origin))
+  const requestPasswordReset = email => runAuthAction(() => sendResetEmail(supabase, email, window.location.origin))
+  const resetPassword = password => runAuthAction(() => changePassword(supabase, password))
   const signOut = async () => {
     if (!supabase || authBusy) return
     setAuthBusy(true)
@@ -449,6 +465,7 @@ export function AppProvider({ children }) {
       value={{
         currentUser,
         session, authLoading, authBusy, authError, loginRole, setLoginRole, signIn, signOut,
+        authMode, setAuthMode, clearAuthError: () => setAuthError(''), signUp, requestPasswordReset, resetPassword,
         complaintsLoading, complaintsError, refreshComplaints, loadComplaint,
         complaintSaving, complaintSaveError, saveOfficialReference,
         switchUserRole,

@@ -31,7 +31,7 @@ test('Journey A: actual stored scheme tools, profile eligibility and official so
   await expect(page.getByRole('dialog').getByRole('link', { name: /Check Official Source/ })).toHaveAttribute('href', 'https://financialservices.gov.in/pmsby')
 })
 
-test('Journey B: analysis dependency is honest, draft transfer requires explicit authenticated confirmation', async ({ page }) => {
+test('Journey B: keyword analysis is labelled, draft transfer requires explicit authenticated confirmation', async ({ page }) => {
   await page.goto('/')
   await login(page, 'citizen')
   let creates = 0
@@ -40,7 +40,7 @@ test('Journey B: analysis dependency is honest, draft transfer requires explicit
   expect(before.status).toBe('ok')
   await ask(page, 'Help prepare a complaint about a broken streetlight near the park')
   const log = page.getByRole('log')
-  await expect(log.getByText('Complaint analysis is not implemented', { exact: false })).toBeVisible()
+  await expect(log.getByText('Complaint analysis: editable keyword suggestion', { exact: false })).toBeVisible()
   await expect(log.getByText('Your draft text (not submitted)', { exact: true })).toBeVisible()
   expect(creates).toBe(0)
   await log.getByRole('button', { name: 'Review complaint draft', exact: true }).click()
@@ -56,7 +56,7 @@ test('Journey B: analysis dependency is honest, draft transfer requires explicit
   await expect.poll(() => creates).toBe(1)
 })
 
-test('Journey C: mixed request invokes scheme path and reports unavailable analysis with a safe draft', async ({ page }) => {
+test('Journey C: mixed request invokes scheme path and reports labelled keyword analysis with a safe draft', async ({ page }) => {
   let reply
   page.on('response', async response => { if (response.url().endsWith('/api/agent/message') && response.status() === 200) reply = await response.json() })
   await page.goto('/')
@@ -65,7 +65,7 @@ test('Journey C: mixed request invokes scheme path and reports unavailable analy
   await expect(page.getByRole('log').getByRole('button', { name: 'Review complaint draft' })).toBeVisible()
   await expect.poll(() => reply?.intent).toBe('mixed')
   expect(reply.tool_trace.some(t => t.tool === 'search_schemes')).toBe(true)
-  expect(reply.tool_trace.some(t => t.tool === 'analyze_complaint' && t.status === 'error')).toBe(true)
+  expect(reply.tool_trace.some(t => t.tool === 'analyze_complaint' && t.status === 'ok')).toBe(true)
   expect(reply.citations.length).toBeGreaterThan(0)
 })
 

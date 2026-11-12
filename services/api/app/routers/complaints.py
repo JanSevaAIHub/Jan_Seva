@@ -10,8 +10,15 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import Complaint, ComplaintEvent, InternalStatus, Profile, Role
 from app.schemas import ComplaintCreate, ComplaintDetail, OfficialReferenceUpdate
+from app.schemas import ComplaintAnalysisInput
+from app.ai.complaint_analysis import analyze_text
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
+
+
+@router.post("/analyze")
+def analyze_complaint(data: ComplaintAnalysisInput, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
+    return analyze_text(db, data.title, data.description, data.locality, user.user_id)
 
 
 def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
@@ -63,6 +70,10 @@ def record_official_reference(complaint_id: UUID, data: OfficialReferenceUpdate,
     if complaint is None:
         raise HTTPException(404, detail={"code": "COMPLAINT_NOT_FOUND", "message": "Complaint not found."})
     complaint.official_ref = data.official_ref
+    # Omitted optional fields retain previously recorded metadata for old clients.
+    for field in ("official_channel", "official_submitted_on"):
+        if field in data.model_fields_set:
+            setattr(complaint, field, getattr(data, field))
     complaint.events.append(ComplaintEvent(actor_id=user.user_id, old_status=complaint.status,
         new_status=complaint.status, note="Citizen recorded an unverified government filing reference; internal status unchanged."))
     db.commit()

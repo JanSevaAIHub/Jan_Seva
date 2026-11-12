@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Siren,
@@ -19,6 +19,7 @@ import {
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 import { CATEGORY_LABELS } from '../lib/complaints'
+import { apiRequest } from '../lib/api'
 
 const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
 
@@ -45,6 +46,11 @@ export function ComplaintForm() {
   const [priority, setPriority] = useState('Medium')
   const [hasPhoto, setHasPhoto] = useState(false)
   const [aiDetected, setAiDetected] = useState(false)
+  const [analysis, setAnalysis] = useState(null)
+  const [analysisBusy, setAnalysisBusy] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
+  const analysisVersion = useRef(0)
+  useEffect(() => { analysisVersion.current++; setAnalysis(null); setAnalysisError(''); setAnalysisBusy(false) }, [session?.user.id])
 
   // Read-only assistant proposal. Editing/navigating never submits a complaint.
   useEffect(() => {
@@ -57,23 +63,19 @@ export function ComplaintForm() {
     setAgentComplaintDraft(null)
   }, [agentComplaintDraft, setAgentComplaintDraft])
 
-  // Auto-detect category from title typing
-  const handleTitleChange = (val) => {
-    setTitle(val)
-    const lower = val.toLowerCase()
-    if (lower.includes('water') || lower.includes('pipe') || lower.includes('drain')) {
-      setCategory('Water Supply & Drainage')
-      setAiDetected(true)
-    } else if (lower.includes('road') || lower.includes('pothole') || lower.includes('traffic')) {
-      setCategory('Roads & Potholes')
-      setAiDetected(true)
-    } else if (lower.includes('garbage') || lower.includes('waste') || lower.includes('clean')) {
-      setCategory('Sanitation & Garbage')
-      setAiDetected(true)
-    } else if (lower.includes('light') || lower.includes('street') || lower.includes('lamp')) {
-      setCategory('Streetlight & Public Lighting')
-      setAiDetected(true)
-    }
+  const handleTitleChange = val => { setTitle(val); setAnalysis(null); setAiDetected(false) }
+  const analyzeComplaint = async () => {
+    if (analysisBusy) return
+    const version = ++analysisVersion.current
+    setAnalysisBusy(true); setAnalysisError('')
+    try {
+      const result = await apiRequest('/complaints/analyze', session?.access_token, { method: 'POST', body: { title, description, locality } })
+      if (version !== analysisVersion.current) return
+      // The API trims outer whitespace. Keep the user's visible draft intact.
+      if (!CATEGORY_LABELS[result.category] || result.description !== description.trim() || !Array.isArray(result.related_complaints)) throw new Error('Invalid analysis response. Continue by selecting a category manually.')
+      setAnalysis(result); setCategory(CATEGORY_LABELS[result.category]); setAiDetected(true)
+    } catch (error) { if (version === analysisVersion.current) setAnalysisError(error.message + ' You can still review and save your complaint without analysis.') }
+    finally { if (version === analysisVersion.current) setAnalysisBusy(false) }
   }
 
   const handleSubmit = (e) => {
@@ -90,9 +92,7 @@ export function ComplaintForm() {
       description,
       locality,
       priority,
-      department: category === 'Streetlight & Public Lighting' ? 'Urban Infrastructure Dept' :
-                  category === 'Roads & Potholes' ? 'Roads & Transport Dept' :
-                  category === 'Sanitation & Garbage' ? 'Sanitation Dept' : 'Water Supply Dept',
+      department: analysis?.suggested_department || 'Confirm the responsible authority for this locality',
       evidenceCount: 0,
       onSuccess: (savedTicket) => {
         setCreatedTicket(savedTicket)
@@ -207,6 +207,13 @@ export function ComplaintForm() {
         </div>
       )}
 
+      <div className="bg-white rounded-xl border p-4 space-y-2 text-xs">
+        <button type="button" disabled={analysisBusy || !session || description.trim().length < 10} onClick={analyzeComplaint} className="rounded-lg bg-violet-600 text-white px-4 py-2 disabled:opacity-50">{analysisBusy ? 'Analyzing complaint...' : 'Analyze complaint (optional)'}</button>
+        {analysisError && <p role="alert" className="text-rose-700">{analysisError}</p>}
+        {analysis && <div role="status"><p>{analysis.notice}</p><p>Suggested authority: {analysis.suggested_department} (confirm locally)</p>
+          {analysis.related_complaints.map(item => <Link className="block text-violet-700 underline" key={item.id} to={`/track?id=${item.id}`}>Possible related complaint: {item.title} - review, not a confirmed duplicate</Link>)}
+        </div>}
+      </div>
       {/* Main Grid: Form Left (7 Cols) + Tracker Right (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left: Interactive Complaint Form */}
@@ -219,6 +226,7 @@ export function ComplaintForm() {
               </label>
               <button
                 type="button"
+                disabled={analysisBusy}
                 onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false) }}
                 className="text-[10px] text-violet-600 hover:underline"
               >
@@ -230,6 +238,7 @@ export function ComplaintForm() {
               required
               minLength={3}
               maxLength={250}
+              disabled={analysisBusy}
               value={title}
               onChange={e => handleTitleChange(e.target.value)}
               placeholder="e.g. Streetlight not working near City Park"
@@ -251,10 +260,12 @@ export function ComplaintForm() {
               )}
             </div>
             <select
+              disabled={analysisBusy}
               value={category}
               onChange={e => {
                 setCategory(e.target.value)
                 setAiDetected(false)
+                setAnalysis(null)
               }}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-white focus:outline-none focus:border-violet-500"
             >
@@ -262,7 +273,6 @@ export function ComplaintForm() {
               <option value="Roads & Potholes">Roads &amp; Potholes</option>
               <option value="Water Supply & Drainage">Water Supply &amp; Drainage</option>
               <option value="Sanitation & Garbage">Sanitation &amp; Garbage</option>
-              <option value="Public Transport">Public Transport</option>
               <option value="Other">Other Civic Grievance</option>
             </select>
           </div>
@@ -280,8 +290,9 @@ export function ComplaintForm() {
               minLength={10}
               required
               maxLength={5000}
+              disabled={analysisBusy}
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => { setDescription(e.target.value); setAnalysis(null); setAiDetected(false) }}
               placeholder="Describe what happened, exact location landmark, and when it started..."
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-violet-500 text-slate-800 leading-relaxed resize-none"
             />
@@ -320,11 +331,12 @@ export function ComplaintForm() {
               type="text"
               aria-label="Locality"
               placeholder="Enter locality or landmark"
+              disabled={analysisBusy}
               value={locality}
               required
               minLength={2}
               maxLength={250}
-              onChange={e => setLocality(e.target.value)}
+              onChange={e => { setLocality(e.target.value); setAnalysis(null) }}
               className="w-full text-xs bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 focus:outline-none"
             />
           </div>

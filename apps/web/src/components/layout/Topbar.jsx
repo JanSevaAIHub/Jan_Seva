@@ -144,7 +144,7 @@ export function Topbar() {
                 <User size={15} />
                 <div>
                   <div>Citizen Sign In</div>
-                  <div className="text-[10px] font-normal text-slate-400">Arjun Mishra (demo account)</div>
+                  <div className="text-[10px] font-normal text-slate-400">Register or use your citizen account</div>
                 </div>
               </button>
 
@@ -161,7 +161,7 @@ export function Topbar() {
                 <ShieldCheck size={15} />
                 <div>
                   <div>Officer Sign In</div>
-                  <div className="text-[10px] font-normal text-slate-400">R. Singh (demo account)</div>
+                  <div className="text-[10px] font-normal text-slate-400">Operator-assigned demo role; not a government official</div>
                 </div>
               </button>
               {session && <button disabled={authBusy} onClick={() => { signOut(); setShowProfileMenu(false) }} className="w-full p-2 text-left text-xs text-rose-700">Sign out</button>}

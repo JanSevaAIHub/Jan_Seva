@@ -53,6 +53,45 @@ def create(workflow_client, persona="citizen"):
     return response.json()
 
 
+def test_filing_metadata_persists_without_changing_internal_status(workflow_client):
+    client, headers, _ = workflow_client
+    saved = create(workflow_client)
+    payload = {"official_ref": "TEST-REF-42", "official_channel": "CPGRAMS", "official_submitted_on": "2026-01-02"}
+    result = client.patch(f"/api/complaints/{saved['id']}/official-ref", json=payload, headers=headers['citizen'])
+    assert result.status_code == 200, result.text
+    for key, value in payload.items():
+        assert result.json()[key] == value
+    detail = client.get(f"/api/complaints/{saved['id']}", headers=headers['citizen']).json()
+    assert detail['official_channel'] == 'CPGRAMS'
+    assert detail['official_status'] == 'USER_REPORTED_FILED'
+    assert detail['status'] == saved['status']
+    assert len(detail['events']) == len(saved['events']) + 1
+    for persona in ['other_citizen', 'officer']:
+        assert client.patch(f"/api/complaints/{saved['id']}/official-ref", json=payload, headers=headers[persona]).status_code in (403, 404)
+
+
+@pytest.mark.parametrize('patch', [
+    {'official_submitted_on': '2999-01-01'}, {'official_submitted_on': 'not-a-date'},
+    {'official_channel': 'invented'}, {'official_ref': ' '}, {'official_ref': 'a\x00b'},
+])
+def test_invalid_filing_metadata_is_rejected(workflow_client, patch):
+    client, headers, _ = workflow_client
+    saved = create(workflow_client)
+    result = client.patch(f"/api/complaints/{saved['id']}/official-ref", json={'official_ref': 'TEST', **patch}, headers=headers['citizen'])
+    assert result.status_code == 422
+
+
+def test_legacy_reference_update_preserves_recorded_channel_and_date(workflow_client):
+    client, headers, _ = workflow_client
+    saved = create(workflow_client)
+    path = f"/api/complaints/{saved['id']}/official-ref"
+    assert client.patch(path, json={'official_ref': 'TEST-1', 'official_channel': 'CPGRAMS', 'official_submitted_on': '2026-01-02'}, headers=headers['citizen']).status_code == 200
+    result = client.patch(path, json={'official_ref': 'TEST-2'}, headers=headers['citizen'])
+    assert result.status_code == 200
+    assert result.json()['official_channel'] == 'CPGRAMS'
+    assert result.json()['official_submitted_on'] == '2026-01-02'
+
+
 def test_create_persist_list_and_detail_after_client_reload(workflow_client, profiles):
     client, headers, engine = workflow_client
     saved = create(workflow_client)
@@ -229,7 +268,7 @@ def test_repeated_identical_creates_are_distinct_tickets_not_silent_deduplicatio
     assert len(first["events"]) == len(second["events"]) == 1
 
 
-@pytest.mark.parametrize("change", [{"category": "electricity"}, {"locality": " "}, {"description": " "}])
+@pytest.mark.parametrize("change", [{"category": "electricity"}, {"locality": " "}, {"description": " "}, {"title": "invalid\x00title"}, {"description": "invalid\x00description"}, {"locality": "invalid\x00locality"}])
 def test_invalid_complaint_fields_are_rejected_without_saving(workflow_client, change):
     client, headers, engine = workflow_client
     response = client.post("/api/complaints", json={**DRAFT, **change}, headers=headers["citizen"])

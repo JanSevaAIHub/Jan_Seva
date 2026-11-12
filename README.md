@@ -8,6 +8,8 @@ Phase 2 Scheme Navigator update (2026-11-09): the existing discovery screen now 
 
 Phase 3 update (2026-11-09): the homepage now calls one read-only LangGraph agent. Scheme, complaint, mixed and ambiguous routing, evidence checks, deterministic eligibility and confirmation-only draft transfer are locally tested. Complaint analysis remains unavailable; hosted integrations are unverified, so Day 1 status is **PARTIAL**. See [Developer A handoff](docs/dev-a-day1-handoff.md).
 
+Final audit update (2026-11-10): citizen signup and password recovery, protected My Complaints views, filing channel/date metadata, owner-scoped related suggestions and shared deterministic complaint analysis are implemented. See [the final release-readiness report](docs/final-release-readiness.md) for measured test results and deployment gates. Earlier status sections are historical.
+
 ## Technology and architecture
 
 - Frontend: React 19, JavaScript, Vite 8, React Router, existing CSS/Tailwind utilities, Lucide icons and Supabase JavaScript client.
@@ -80,13 +82,19 @@ $env:PYTHONPATH = 'services/api'
 .\.venv\Scripts\python.exe -m app.scripts.evaluate_schemes
 ```
 
-Migration 001 creates tables, constraints and access policies; the same `app.scripts.migrate` command also applies migration 003 to widen existing complaint categories without deleting records. Migration 002 enables pgvector and vector metadata through `app.scripts.migrate_schemes`. Operators need the corresponding database privileges. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts twenty explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
+Migration 001 creates tables, constraints and access policies; the same `app.scripts.migrate` command also applies migration 004 for optional filing channel/date metadata and migration 003 to widen existing complaint categories without deleting records. Migration 002 enables pgvector and vector metadata through `app.scripts.migrate_schemes`. Operators need the corresponding database privileges. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts twenty explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
 
 A verified first-time user now receives a server-owned citizen profile automatically; officer access still requires an operator-assigned database role. For the combined-branch audit, validation and operator helper instructions, see [docs/combined-work-review.md](docs/combined-work-review.md). Earlier phase documents are historical verification records.
 
 Only the configured demo citizen's **new** complaints are assigned to the configured officer. Both profiles must exist and the assignee must be an officer. Absent assignment leaves tickets unassigned; partial/invalid configuration fails closed. This grants no other user's access and does not reassign historical tickets.
 
 The checked-in corpus contains **12 schemes, 12 reviewed source notes and 12 current chunks**: the original eight plus PM-SYM and Ladakh-reviewed IGNOAPS, IGNWPS and IGNDPS. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
+
+## Citizen authentication setup
+
+For configuration, safe migration gates, Supabase Dashboard instructions and prepared Netlify/Render settings, use the [deployment and live-integration runbook](docs/deployment-runbook.md). Run the read-only deployment checks before publishing; they intentionally block when configuration is missing or private credentials appear in browser settings. No live deployment has been performed.
+
+Configure the Supabase Site URL to the deployed frontend origin and allow the exact `/auth/callback` and `/auth/reset` URLs for that origin (and explicit development origins when needed). The static host must serve the SPA for those routes. Configure email confirmation, password policy, SMTP and provider rate limits/CAPTCHA according to your deployment needs. The app supports both confirmation-required signup and immediate sessions, never client-assigned officer roles. Test real email delivery and recovery on an authorized development project before public release. Supabase Auth, database and AI live integrations are unverified in this checkout.
 
 ## Running
 

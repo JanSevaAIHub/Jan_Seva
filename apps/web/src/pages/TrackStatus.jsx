@@ -63,6 +63,7 @@ export function TrackStatus() {
         </p>
       </div>
 
+      <Link to="/requests" className="text-sm font-semibold text-violet-700">My Complaints: view all saved requests</Link>
       {/* Search Bar Card */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center gap-3">
@@ -170,6 +171,9 @@ export function TrackStatus() {
               <span className="text-slate-500 block">Government filing (separate from internal status)</span>
               <span className="font-semibold">{selectedTicket.officialStatus}</span>
               {selectedTicket.officialRef && <p>User-provided reference: {selectedTicket.officialRef} (unverified)</p>}
+              {selectedTicket.officialChannel && <p>Filing channel: {selectedTicket.officialChannel.replaceAll('_', ' ')}</p>}
+              {selectedTicket.officialSubmittedOn && <p>Reported submission date: {selectedTicket.officialSubmittedOn}</p>}
+              <a href="https://pgportal.gov.in/Status" target="_blank" rel="noopener noreferrer" className="block mt-2 text-violet-700 underline">Track on Government Website (CPGRAMS)</a>
             </div>
 
             <button
@@ -231,7 +235,7 @@ export function TrackStatus() {
         </div>
       ) : (
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
-          No request selected. Enter an ID above to track status.
+          No request selected. Choose a saved complaint from My Complaints or enter its ID.
         </div>
       )}
     </div>

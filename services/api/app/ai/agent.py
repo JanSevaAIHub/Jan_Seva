@@ -16,7 +16,7 @@ from app.ai.provider import ProviderError, provider_post
 from app.ai.rag import INSTRUCTION_MARKERS, answer_question, insufficient, render_evidence_answer
 from app.ai.scheme_schemas import ToolTrace
 from app.config import ConfigurationError
-from app.models import Scheme, SchemeChunk
+from app.models import ComplaintCategory, Scheme, SchemeChunk
 
 
 class AgentState(TypedDict, total=False):
@@ -26,6 +26,7 @@ class AgentState(TypedDict, total=False):
     eligibility: list
     draft: object
     tickets: object
+    analysis: object
     failed: bool
     result: AgentResponse
 
@@ -115,10 +116,13 @@ def run_agent(db, request, verified_user_id=None):
                 updates["tickets"] = agent_tools.get_my_complaints(db, verified_user_id)
                 trace.append(ToolTrace(tool="get_my_complaints", status="ok" if updates["tickets"] is not None else "skipped", detail="Existing ownership/assignment-scoped complaint listing used." if updates["tickets"] is not None else "Sign in with an established profile to read private tickets."))
             else:
-                capability = agent_tools.analyze_complaint(db, request)
-                trace.append(ToolTrace(tool="analyze_complaint", status="error", detail=capability["detail"]))
+                capability = agent_tools.analyze_complaint(db, request, verified_user_id)
+                updates["analysis"] = capability
+                trace.append(ToolTrace(tool="analyze_complaint", status="ok", detail=capability["detail"]))
                 updates["draft"] = agent_tools.draft_complaint(request)
-                trace.append(ToolTrace(tool="draft_complaint", status="ok", detail="Copied supplied text into an editable proposal only. No category prediction, ticket creation or government filing."))
+                if updates["draft"].category is None:
+                    updates["draft"] = updates["draft"].model_copy(update={"category": ComplaintCategory(capability["category"])})
+                trace.append(ToolTrace(tool="draft_complaint", status="ok", detail="Copied supplied text into an editable proposal only. Category is an editable keyword suggestion. No ticket creation or government filing."))
         updates["trace"] = trace
         return updates
 
@@ -157,7 +161,10 @@ def run_agent(db, request, verified_user_id=None):
         if state["intent"] in {"scheme", "mixed"}:
             actions.append(AgentAction(tool="open_schemes", status="ok", detail="Browse sources and edit your local eligibility profile.", label="Open Scheme Discovery", path="/schemes"))
         if state.get("draft") is not None:
-            parts.append("Complaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced. Your supplied text is available as an editable draft; review and complete its fields in the existing complaint form. Nothing has been saved, registered, sent or filed with a government system. An authenticated review and explicit confirmation are required to create an internal JanSeva ticket.")
+            analysis = state["analysis"]
+            parts.append("Complaint analysis: editable keyword suggestion - " + analysis["category"] + ". " + analysis["notice"] + " Suggested authority (confirm locally): " + analysis["suggested_department"] + ". Nothing has been saved or filed. Review and explicitly confirm before creating an internal ticket.")
+            if analysis["related_complaints"]:
+                parts.append("Related suggestions from your own saved complaints: " + "; ".join(item["title"] for item in analysis["related_complaints"]))
             actions.append(AgentAction(tool="draft_complaint", status="ok", detail="Confirmation required in the existing authenticated review flow. No action has been executed.", label="Review complaint draft", path="/complaints/new", requires_confirmation=True, draft=state["draft"]))
         if wants_private_tickets(request.message) and state["intent"] in {"complaint", "mixed"}:
             tickets = state.get("tickets")

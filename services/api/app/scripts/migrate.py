@@ -3,7 +3,7 @@
 from pathlib import Path
 import sys
 
-from sqlalchemy import String, inspect
+from sqlalchemy import Date, String, inspect
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -13,6 +13,7 @@ from app.models import CORE_TABLES
 
 MIGRATION = Path(__file__).resolve().parents[2] / "migrations" / "001_initial.sql"
 CATEGORY_UPGRADE = MIGRATION.with_name("003_complaint_category_width.sql")
+FILING_UPGRADE = MIGRATION.with_name("004_official_filing_metadata.sql")
 
 
 def validate_schema(connection: Connection) -> None:
@@ -22,6 +23,8 @@ def validate_schema(connection: Connection) -> None:
         for column in table.columns:
             if column.name not in actual or actual[column.name]["nullable"] != column.nullable:
                 raise ConfigurationError(f"Incompatible existing table: {table.name}.{column.name}; review manually without dropping data.")
+            if isinstance(column.type, Date) and not isinstance(actual[column.name]["type"], Date):
+                raise ConfigurationError(f"Incompatible date column: {table.name}.{column.name}; review manually without changing existing data.")
             if isinstance(column.type, String):
                 reflected = actual[column.name]["type"]
                 if (not isinstance(reflected, String) or
@@ -62,6 +65,7 @@ def migrate() -> None:
     with get_engine().begin() as connection:
         connection.exec_driver_sql(MIGRATION.read_text(encoding="utf-8"), execution_options={"no_parameters": True})
         connection.exec_driver_sql(CATEGORY_UPGRADE.read_text(encoding="utf-8"), execution_options={"no_parameters": True})
+        connection.exec_driver_sql(FILING_UPGRADE.read_text(encoding="utf-8"), execution_options={"no_parameters": True})
         validate_schema(connection)
 
 
@@ -74,4 +78,4 @@ if __name__ == "__main__":
     except SQLAlchemyError:
         print("Migration not applied. Check database connectivity, privileges and schema compatibility; transaction rolled back.", file=sys.stderr)
         sys.exit(1)
-    print("001_initial.sql and 003_complaint_category_width.sql applied and schema verified (safe to rerun).")
+    print("001_initial.sql, 003_complaint_category_width.sql and 004_official_filing_metadata.sql applied and schema verified (safe to rerun).")

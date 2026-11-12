@@ -2,6 +2,7 @@
 from uuid import UUID
 
 from app.ai.agent_schemas import ComplaintDraft
+from app.ai.complaint_analysis import analyze_text
 from app.ai.eligibility import EligibilityProfile, evaluate_eligibility
 from app.ai.rag import answer_question
 from app.ai.scheme_schemas import SchemeAsk, SchemeProfile
@@ -21,10 +22,11 @@ def check_eligibility(db, scheme_id: UUID, profile: EligibilityProfile | None):
     return evaluate_eligibility(scheme, profile or EligibilityProfile()) if scheme is not None else None
 
 
-def analyze_complaint(_db, _request):
-    # No category classifier/analysis endpoint exists in this combined checkout.
-    # This explicit capability result is the Developer B integration boundary.
-    return {"available": False, "detail": "Complaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced."}
+def analyze_complaint(db, request, verified_user_id=None):
+    supplied = request.complaint or ComplaintDraft()
+    result = analyze_text(db, supplied.title, supplied.description or request.message,
+                          supplied.locality, verified_user_id)
+    return {"available": True, "detail": result["notice"], **result}
 
 
 def draft_complaint(request) -> ComplaintDraft:

@@ -52,7 +52,10 @@ def test_existing_database_upgrade_runs_before_validation_in_one_transaction(mon
     assert "CREATE TABLE IF NOT EXISTS public.complaints" in calls[0]
     assert "ALTER TABLE public.complaints ALTER COLUMN category TYPE VARCHAR(50)" in calls[1]
     assert "character_maximum_length < 50" in calls[1]
-    assert calls[2] == "validated"
+    assert "ADD COLUMN IF NOT EXISTS official_channel" in calls[2]
+    assert "ADD COLUMN IF NOT EXISTS official_submitted_on" in calls[2]
+    assert "complaints_filing_requires_reference" in calls[2]
+    assert calls[3] == "validated"
 
 
 @pytest.mark.parametrize("failure", ["timeout", "401", "429", "500", "bad-json"])

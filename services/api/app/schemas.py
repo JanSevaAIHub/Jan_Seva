@@ -1,16 +1,25 @@
 """Validated API boundary models; server-owned identity/status fields are not inputs."""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from app.models import ComplaintCategory, InternalStatus, Role
 
 
 class APIModel(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid", str_strip_whitespace=True)
+
+    @field_validator('*', mode='before')
+    @classmethod
+    def reject_nul_text(cls, value):
+        # PostgreSQL text cannot store U+0000. Reject at the boundary rather
+        # than failing a valid-looking complaint during its database write.
+        if isinstance(value, str) and '\x00' in value:
+            raise ValueError('Text must not contain NUL characters')
+        return value
 
 
 class HealthResponse(BaseModel):
@@ -52,6 +61,12 @@ class ComplaintCreate(APIModel):
     locality: str = Field(min_length=2, max_length=250)
 
 
+class ComplaintAnalysisInput(APIModel):
+    title: str = Field(default="", max_length=250)
+    description: str = Field(min_length=10, max_length=5000)
+    locality: str = Field(default="", max_length=250)
+
+
 class ComplaintSummary(APIModel):
     id: UUID
     user_id: UUID
@@ -61,6 +76,8 @@ class ComplaintSummary(APIModel):
     status: InternalStatus
     assigned_officer_id: UUID | None
     official_ref: str | None
+    official_channel: str | None = None
+    official_submitted_on: date | None = None
     created_at: datetime
     updated_at: datetime
     is_synthetic: bool
@@ -90,3 +107,21 @@ class ComplaintStatusUpdate(APIModel):
 class OfficialReferenceUpdate(APIModel):
     official_ref: str = Field(min_length=1, max_length=250)
 
+
+    official_channel: Literal["CPGRAMS", "CONNECT_PUNJAB", "OTHER_OFFICIAL"] | None = None
+    official_submitted_on: date | None = None
+
+    @field_validator("official_ref")
+    @classmethod
+    def safe_reference(cls, value):
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("Reference must not contain control characters")
+        return value
+
+    @field_validator("official_submitted_on")
+    @classmethod
+    def no_future_filing(cls, value):
+        today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+        if value is not None and value > today:
+            raise ValueError("Submission date cannot be in the future")
+        return value

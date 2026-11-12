@@ -52,7 +52,7 @@ def test_routing_intents(client, evidence, message, intent):
     assert data["intent"] == intent and data["response"] and data["tool_trace"]
     if intent in {"scheme", "mixed"}: assert data["citations"]
     if intent in {"complaint", "mixed"}:
-        assert any(t["tool"] == "analyze_complaint" and t["status"] == "error" for t in data["tool_trace"])
+        assert any(t["tool"] == "analyze_complaint" and t["status"] == "ok" for t in data["tool_trace"])
         assert any(a["requires_confirmation"] and a["path"] == "/complaints/new" for a in data["actions"])
 
 

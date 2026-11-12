@@ -38,7 +38,7 @@ export function Sidebar() {
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
           <ClipboardList size={18} strokeWidth={2} />
-          <span>My Requests</span>
+          <span>My Complaints</span>
         </NavLink>
 
         <NavLink
