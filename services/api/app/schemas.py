@@ -125,3 +125,46 @@ class OfficialReferenceUpdate(APIModel):
         if value is not None and value > today:
             raise ValueError("Submission date cannot be in the future")
         return value
+
+
+class DuplicateComplaintMatch(APIModel):
+    id: UUID
+    title: str
+    locality: str
+    category: ComplaintCategory
+    status: InternalStatus
+    similarity_score: float = Field(ge=0, le=1)
+    created_at: datetime
+
+
+class ComplaintAnalyzeRequest(ComplaintAnalysisInput):
+    """Shared validated input for both existing analysis callers."""
+    description: str = Field(min_length=5, max_length=5000)
+    locality: str | None = Field(default="", max_length=250)
+
+    @field_validator('title')
+    @classmethod
+    def supported_title(cls, value):
+        if value and len(value) < 2:
+            raise ValueError('Use at least two characters or leave the title unspecified')
+        return value
+
+
+class RelatedComplaintSuggestion(APIModel):
+    id: UUID
+    title: str
+    reason: str
+
+
+class ComplaintAnalyzeResponse(APIModel):
+    category: ComplaintCategory
+    department: str
+    confidence: float = Field(ge=0, le=1)
+    urgency_level: Literal["Low", "Medium", "High"]
+    duplicates: list[DuplicateComplaintMatch] = Field(default_factory=list)
+    mode: str = "keyword_classifier"
+    description: str
+    suggested_department: str
+    method: str = "deterministic_keywords"
+    related_complaints: list[RelatedComplaintSuggestion] = Field(default_factory=list)
+    notice: str

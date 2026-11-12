@@ -4,9 +4,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.auth import assigned_officer_complaint, require_officer
+from app.auth import assigned_officer_complaint, require_officer, visible_complaints
 from app.db import get_db
 from app.models import Complaint, ComplaintEvent, InternalStatus, Profile
 from app.schemas import ComplaintDetail, ComplaintStatusUpdate
@@ -17,6 +17,24 @@ NEXT_STATUS = {
     InternalStatus.UNDER_REVIEW: InternalStatus.IN_PROGRESS,
     InternalStatus.IN_PROGRESS: InternalStatus.RESOLVED,
 }
+
+
+@router.get("", response_model=list[ComplaintDetail])
+def list_officer_complaints(
+    status: InternalStatus | None = None,
+    category: str | None = None,
+    locality: str | None = None,
+    user: Profile = Depends(require_officer),
+    db: Session = Depends(get_db),
+):
+    query = visible_complaints(user).options(selectinload(Complaint.events)).order_by(Complaint.created_at.desc(), Complaint.id)
+    if status is not None:
+        query = query.where(Complaint.status == status)
+    if category is not None and category.strip():
+        query = query.where(Complaint.category == category.strip().lower())
+    if locality is not None and locality.strip():
+        query = query.where(Complaint.locality.ilike(f"%{locality.strip()}%"))
+    return db.scalars(query).all()
 
 
 @router.patch("/{complaint_id}", response_model=ComplaintDetail)

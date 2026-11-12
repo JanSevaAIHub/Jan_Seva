@@ -52,6 +52,27 @@ export function ComplaintForm() {
   const analysisVersion = useRef(0)
   useEffect(() => { analysisVersion.current++; setAnalysis(null); setAnalysisError(''); setAnalysisBusy(false) }, [session?.user.id])
 
+  const [automaticAnalysis, setAutomaticAnalysis] = useState(null)
+  const [autoAnalyzing, setAutoAnalyzing] = useState(false)
+  // Preserve debounced duplicate alerts without replacing manual category edits.
+  useEffect(() => {
+    setAutomaticAnalysis(null); setAutoAnalyzing(false)
+    if (!session || title.trim().length < 3 || description.trim().length < 10) return
+    let cancelled = false
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setAutoAnalyzing(true)
+      try {
+        const result = await apiRequest('/complaints/analyze', session.access_token, {
+          method: 'POST', signal: controller.signal, body: { title, description, locality },
+        })
+        if (!cancelled && Array.isArray(result.duplicates)) setAutomaticAnalysis(result)
+      } catch { /* Optional analysis must never erase drafts or block saving. */ }
+      finally { if (!cancelled) setAutoAnalyzing(false) }
+    }, 450)
+    return () => { cancelled = true; clearTimeout(timer); controller.abort() }
+  }, [title, description, locality, session?.access_token])
+
   // Read-only assistant proposal. Editing/navigating never submits a complaint.
   useEffect(() => {
     if (!agentComplaintDraft) return
@@ -62,6 +83,10 @@ export function ComplaintForm() {
     setAiDetected(false)
     setAgentComplaintDraft(null)
   }, [agentComplaintDraft, setAgentComplaintDraft])
+
+  const duplicateMatches = (analysis || automaticAnalysis)?.duplicates || []
+  const suggestedDept = (analysis || automaticAnalysis)?.suggested_department || ''
+  const analyzing = analysisBusy || autoAnalyzing
 
   const handleTitleChange = val => { setTitle(val); setAnalysis(null); setAiDetected(false) }
   const analyzeComplaint = async () => {
@@ -227,7 +252,7 @@ export function ComplaintForm() {
               <button
                 type="button"
                 disabled={analysisBusy}
-                onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false) }}
+                onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false); setAnalysis(null) }}
                 className="text-[10px] text-violet-600 hover:underline"
               >
                 Load sample
@@ -292,7 +317,7 @@ export function ComplaintForm() {
               maxLength={5000}
               disabled={analysisBusy}
               value={description}
-              onChange={e => { setDescription(e.target.value); setAnalysis(null); setAiDetected(false) }}
+              onChange={e => { setDescription(e.target.value); setAnalysis(null); setAiDetected(false); setAnalysis(null) }}
               placeholder="Describe what happened, exact location landmark, and when it started..."
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-violet-500 text-slate-800 leading-relaxed resize-none"
             />
@@ -416,12 +441,34 @@ export function ComplaintForm() {
           </div>
 
           {/* Similar Complaints (AI Suggestion Alert) */}
-          <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
-            <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
-            <div className="text-xs text-indigo-950 leading-relaxed">
-              <strong>Similar Complaints:</strong> Duplicate detection is not enabled in this phase.
+          {duplicateMatches.length > 0 ? (
+            <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                <AlertCircle size={16} className="text-amber-600 flex-none" />
+                <span>May be related to your own saved grievances in {locality || 'your area'}:</span>
+              </div>
+              <div className="space-y-1.5 pl-6">
+                {duplicateMatches.map(dup => (
+                  <div key={dup.id} className="text-xs text-amber-950 bg-white/90 p-2 rounded-lg border border-amber-200/60 flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold">{dup.title}</span>
+                      <span className="text-[11px] text-slate-500 ml-2">({dup.locality} • {dup.status.replace('_', ' ')})</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      Heuristic similarity: {dup.similarity_score.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
+              <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
+              <div className="text-xs text-indigo-950 leading-relaxed">
+                <strong>AI Assistant:</strong> {analyzing ? 'Analyzing grievance and checking for duplicates...' : (suggestedDept ? `Recommended department: ${suggestedDept}. No related suggestions were returned; this does not prove there are no duplicates.` : 'Optional analysis offers editable category and related-complaint suggestions.')}
+              </div>
+            </div>
+          )}
 
           <p className="text-[11px] text-slate-500">Draft storage is unavailable. Your values stay in this form for review or retry; refreshing clears unsaved values.</p>
           {/* Action Buttons */}

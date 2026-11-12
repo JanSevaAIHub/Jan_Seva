@@ -5,20 +5,20 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload
 
+from app.ai.complaint_classifier import analyze_complaint_submission
 from app.auth import accessible_complaint, get_current_user, require_citizen, visible_complaints
 from app.config import get_settings
 from app.db import get_db
 from app.models import Complaint, ComplaintEvent, InternalStatus, Profile, Role
 from app.schemas import ComplaintCreate, ComplaintDetail, OfficialReferenceUpdate
-from app.schemas import ComplaintAnalysisInput
-from app.ai.complaint_analysis import analyze_text
+from app.schemas import ComplaintAnalyzeRequest, ComplaintAnalyzeResponse
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 
-@router.post("/analyze")
-def analyze_complaint(data: ComplaintAnalysisInput, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
-    return analyze_text(db, data.title, data.description, data.locality, user.user_id)
+@router.post("/analyze", response_model=ComplaintAnalyzeResponse)
+def analyze_complaint(data: ComplaintAnalyzeRequest, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
+    return analyze_complaint_submission(db, data, verified_user_id=user.user_id)
 
 
 def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
@@ -51,10 +51,20 @@ def create_complaint(data: ComplaintCreate, user: Profile = Depends(require_citi
 
 
 @router.get("", response_model=list[ComplaintDetail])
-def list_complaints(status: InternalStatus | None = None, user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_complaints(
+    status: InternalStatus | None = None,
+    category: str | None = None,
+    locality: str | None = None,
+    user: Profile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     query = visible_complaints(user).options(selectinload(Complaint.events)).order_by(Complaint.created_at.desc(), Complaint.id)
     if status is not None:
         query = query.where(Complaint.status == status)
+    if category is not None and category.strip():
+        query = query.where(Complaint.category == category.strip().lower())
+    if locality is not None and locality.strip():
+        query = query.where(Complaint.locality.ilike(f"%{locality.strip()}%"))
     return db.scalars(query).all()
 
 

@@ -1,0 +1,366 @@
+{
+  "classification": {
+    "total_cases": 15,
+    "correct": 15,
+    "accuracy_pct": 100.0,
+    "department_accuracy_pct": 100.0,
+    "results": [
+      {
+        "id": "C01",
+        "title": "Potholes on main avenue road",
+        "expected_category": "road",
+        "predicted_category": "road",
+        "expected_dept": "Roads & Transport Dept",
+        "predicted_dept": "Roads & Transport Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C02",
+        "title": "Asphalt washed away near highway underpass",
+        "expected_category": "road",
+        "predicted_category": "road",
+        "expected_dept": "Roads & Transport Dept",
+        "predicted_dept": "Roads & Transport Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C03",
+        "title": "Broken footpath pavement creating trip hazard",
+        "expected_category": "road",
+        "predicted_category": "road",
+        "expected_dept": "Roads & Transport Dept",
+        "predicted_dept": "Roads & Transport Dept",
+        "confidence": 0.95,
+        "urgency": "High",
+        "status": "PASS"
+      },
+      {
+        "id": "C04",
+        "title": "Low municipal water pressure in residential block",
+        "expected_category": "water",
+        "predicted_category": "water",
+        "expected_dept": "Water Supply Dept",
+        "predicted_dept": "Water Supply Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C05",
+        "title": "Main drinking water pipeline leakage",
+        "expected_category": "water",
+        "predicted_category": "water",
+        "expected_dept": "Water Supply Dept",
+        "predicted_dept": "Water Supply Dept",
+        "confidence": 0.95,
+        "urgency": "High",
+        "status": "PASS"
+      },
+      {
+        "id": "C06",
+        "title": "Contaminated muddy paani coming from tap",
+        "expected_category": "water",
+        "predicted_category": "water",
+        "expected_dept": "Water Supply Dept",
+        "predicted_dept": "Water Supply Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C07",
+        "title": "Garbage dump overflowing with plastic waste",
+        "expected_category": "sanitation",
+        "predicted_category": "sanitation",
+        "expected_dept": "Sanitation Dept",
+        "predicted_dept": "Sanitation Dept",
+        "confidence": 0.95,
+        "urgency": "High",
+        "status": "PASS"
+      },
+      {
+        "id": "C08",
+        "title": "Open sewer drain blocked with debris",
+        "expected_category": "sanitation",
+        "predicted_category": "sanitation",
+        "expected_dept": "Sanitation Dept",
+        "predicted_dept": "Sanitation Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C09",
+        "title": "Market vegetable waste not collected by safai sweepers",
+        "expected_category": "sanitation",
+        "predicted_category": "sanitation",
+        "expected_dept": "Sanitation Dept",
+        "predicted_dept": "Sanitation Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C10",
+        "title": "Streetlights not working on 5th cross road",
+        "expected_category": "streetlight",
+        "predicted_category": "streetlight",
+        "expected_dept": "Urban Infrastructure Dept",
+        "predicted_dept": "Urban Infrastructure Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C11",
+        "title": "Sparking live electrical wire from lamppost",
+        "expected_category": "streetlight",
+        "predicted_category": "streetlight",
+        "expected_dept": "Urban Infrastructure Dept",
+        "predicted_dept": "Urban Infrastructure Dept",
+        "confidence": 0.95,
+        "urgency": "High",
+        "status": "PASS"
+      },
+      {
+        "id": "C12",
+        "title": "Fused sodium vapor lamp outside community hall",
+        "expected_category": "streetlight",
+        "predicted_category": "streetlight",
+        "expected_dept": "Urban Infrastructure Dept",
+        "predicted_dept": "Urban Infrastructure Dept",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C13",
+        "title": "Stray dog pack chasing two-wheelers",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_dept": "Municipal Grievance Cell",
+        "predicted_dept": "Municipal Grievance Cell",
+        "confidence": 0.88,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C14",
+        "title": "Illegal roadside vendor encroachment blocking gate",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_dept": "Municipal Grievance Cell",
+        "predicted_dept": "Municipal Grievance Cell",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      },
+      {
+        "id": "C15",
+        "title": "Community park overgrown wild grass and damaged benches",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_dept": "Municipal Grievance Cell",
+        "predicted_dept": "Municipal Grievance Cell",
+        "confidence": 0.95,
+        "urgency": "Medium",
+        "status": "PASS"
+      }
+    ]
+  },
+  "duplicates": {
+    "total_pairs": 10,
+    "true_positives": 5,
+    "false_positives": 0,
+    "true_negatives": 5,
+    "false_negatives": 0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "f1_score": 100.0,
+    "threshold": 0.5,
+    "results": [
+      {
+        "pair_id": "P01",
+        "type": "DUPLICATE",
+        "expected": true,
+        "detected": true,
+        "status": "TRUE_POSITIVE"
+      },
+      {
+        "pair_id": "P02",
+        "type": "DUPLICATE",
+        "expected": true,
+        "detected": true,
+        "status": "TRUE_POSITIVE"
+      },
+      {
+        "pair_id": "P03",
+        "type": "DUPLICATE",
+        "expected": true,
+        "detected": true,
+        "status": "TRUE_POSITIVE"
+      },
+      {
+        "pair_id": "P04",
+        "type": "DUPLICATE",
+        "expected": true,
+        "detected": true,
+        "status": "TRUE_POSITIVE"
+      },
+      {
+        "pair_id": "P05",
+        "type": "DUPLICATE",
+        "expected": true,
+        "detected": true,
+        "status": "TRUE_POSITIVE"
+      },
+      {
+        "pair_id": "P06",
+        "type": "LOCALITY_MISMATCH",
+        "expected": false,
+        "detected": false,
+        "status": "TRUE_NEGATIVE"
+      },
+      {
+        "pair_id": "P07",
+        "type": "LOCALITY_MISMATCH",
+        "expected": false,
+        "detected": false,
+        "status": "TRUE_NEGATIVE"
+      },
+      {
+        "pair_id": "P08",
+        "type": "CATEGORY_MISMATCH",
+        "expected": false,
+        "detected": false,
+        "status": "TRUE_NEGATIVE"
+      },
+      {
+        "pair_id": "P09",
+        "type": "DISTINCT_ISSUES",
+        "expected": false,
+        "detected": false,
+        "status": "TRUE_NEGATIVE"
+      },
+      {
+        "pair_id": "P10",
+        "type": "UNRELATED",
+        "expected": false,
+        "detected": false,
+        "status": "TRUE_NEGATIVE"
+      }
+    ]
+  },
+  "security_matrix": [
+    {
+      "test": "Anonymous complaint creation",
+      "method": "POST",
+      "url": "/api/complaints",
+      "auth": null,
+      "expected_status": 401,
+      "actual_status": 401,
+      "notes": "Missing Authorization header rejected.",
+      "passed": true
+    },
+    {
+      "test": "Citizen accessing complaints",
+      "method": "GET",
+      "url": "/api/complaints",
+      "auth": "Citizen JWT",
+      "expected_status": 200,
+      "actual_status": 200,
+      "notes": "Returns strictly citizen-owned records.",
+      "passed": true
+    },
+    {
+      "test": "Citizen accessing another user complaint",
+      "method": "GET",
+      "url": "/api/complaints/{foreign_id}",
+      "auth": "Citizen JWT",
+      "expected_status": 404,
+      "actual_status": 404,
+      "notes": "No data leakage; unowned ticket returns 404.",
+      "passed": true
+    },
+    {
+      "test": "Citizen attempting officer status update",
+      "method": "PATCH",
+      "url": "/api/officer/complaints/{id}",
+      "auth": "Citizen JWT",
+      "expected_status": 403,
+      "actual_status": 403,
+      "notes": "Citizen role rejected by require_officer guard.",
+      "passed": true
+    },
+    {
+      "test": "Officer accessing officer queue",
+      "method": "GET",
+      "url": "/api/officer/complaints",
+      "auth": "Officer JWT",
+      "expected_status": 200,
+      "actual_status": 200,
+      "notes": "Returns department/assigned complaints.",
+      "passed": true
+    },
+    {
+      "test": "Citizen accessing officer queue",
+      "method": "GET",
+      "url": "/api/officer/complaints",
+      "auth": "Citizen JWT",
+      "expected_status": 403,
+      "actual_status": 403,
+      "notes": "Citizen role blocked from officer queue.",
+      "passed": true
+    },
+    {
+      "test": "Invalid JWT signature token",
+      "method": "GET",
+      "url": "/api/complaints",
+      "auth": "Forged Token",
+      "expected_status": 401,
+      "actual_status": 401,
+      "notes": "Cryptographic signature validation fails.",
+      "passed": true
+    },
+    {
+      "test": "Malformed / expired bearer token",
+      "method": "GET",
+      "url": "/api/complaints",
+      "auth": "Expired Token",
+      "expected_status": 401,
+      "actual_status": 401,
+      "notes": "Expired token rejected before route execution.",
+      "passed": true
+    }
+  ],
+  "latency_benchmarks": {
+    "GET /api/health": {
+      "runs": 30,
+      "min_ms": 1.43,
+      "p50_ms": 1.66,
+      "p95_ms": 2.31,
+      "mean_ms": 1.78,
+      "max_ms": 4.48
+    },
+    "GET /api/schemes": {
+      "runs": 30,
+      "min_ms": 174.19,
+      "p50_ms": 180.32,
+      "p95_ms": 196.65,
+      "mean_ms": 184.33,
+      "max_ms": 261.26
+    },
+    "POST /api/complaints/analyze": {
+      "runs": 30,
+      "min_ms": 221.17,
+      "p50_ms": 231.06,
+      "p95_ms": 254.95,
+      "mean_ms": 232.64,
+      "max_ms": 281.51
+    }
+  }
+}

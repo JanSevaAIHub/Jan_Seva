@@ -33,11 +33,14 @@ from app.main import app
 from app.models import CORE_TABLES, Profile, Role, Scheme, SchemeChunk
 from app.ai.corpus import CHUNKING_VERSION, CORPUS, chunk_evidence, content_hash, read_corpus
 from app.ai import retrieval
+from app.ai.budget import ModelBudget
+from app.routers import schemes
 
 # Explicit TEST DOUBLE: bypass only the PostgreSQL catalog guard in isolated
 # SQLite. With no provider key, the real retrieve() uses real stored-text lexical
 # fallback. No fake embeddings, generated answers or synthetic schemes are used.
 retrieval.prepare_vectors = lambda _db: None
+schemes.model_budget = ModelBudget(per_client=100, total=300)
 
 # The fake Auth endpoints also receive Supabase SDK headers (apikey, client info).
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5174"],
