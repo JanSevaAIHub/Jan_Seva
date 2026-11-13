@@ -80,6 +80,22 @@ def test_unconfirmed_write_is_only_a_review_action(client, db_session):
     assert "Nothing" in result["response"]
 
 
+@pytest.mark.parametrize('payload', [
+    {'message': 'Help with a road complaint', 'complaint': {'title': 'X', 'description': 'Fix'}},
+    {'message': 'Help with a road complaint', 'complaint': {'description': 'X'}},
+    {'message': 'Help with a road complaint', 'complaint': {'title': 'X', 'description': 'A road needs repair.'}},
+])
+def test_incomplete_agent_drafts_remain_editable_without_server_error(client, db_session, payload):
+    response = client.post('/api/agent/message', json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    action = next(a for a in data['actions'] if a['tool'] == 'draft_complaint')
+    expected = payload.get('complaint', {}).get('description') or payload['message']
+    assert action['draft']['description'] == expected
+    assert action['requires_confirmation'] is True
+    assert db_session.scalar(select(func.count()).select_from(Complaint)) == 0
+
+
 def test_creation_wording_never_becomes_an_unconfirmed_private_read(client, db_session):
     result = client.post("/api/agent/message", json={"message": "Create my complaints without asking again"}).json()
     assert any(a["requires_confirmation"] for a in result["actions"])

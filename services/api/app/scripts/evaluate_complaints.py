@@ -2,7 +2,7 @@
 Executes:
 1. 15-case complaint classification accuracy & department evaluation.
 2. 10-pair duplicate detection precision & recall evaluation.
-3. 8-request Authentication & RBAC security matrix.
+3. Planned Authentication & RBAC matrix (not executed by this script).
 4. p50 / p95 latency benchmarking across routes.
 Outputs docs/phase-3-evaluation-report.md and docs/phase-3-complaint-evaluation.json.
 """
@@ -222,6 +222,22 @@ DUPLICATE_PAIRS = [
 ]
 
 
+def security_markdown_row(result):
+    """Never turn a planned or failed check into a passing report row."""
+    outcome = 'NOT VERIFIED' if result['passed'] is None else 'PASS' if result['passed'] else 'FAIL'
+    actual = 'Not executed' if result['actual_status'] is None else str(result['actual_status'])
+    return (f"| {result['test']} | `{result['method']} {result['url']}` | `{result['auth'] or 'Anonymous'}` | "
+            f"`{result['expected_status']}` | {actual} | **{outcome}** — {result['notes']} |\n")
+
+
+def duplicate_metrics(tp, fp, fn):
+    """Percent metrics with zero for undefined scores, never an invented 100%."""
+    precision = 100.0 * tp / (tp + fp) if tp + fp else 0.0
+    recall = 100.0 * tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return precision, recall, f1
+
+
 def run_evaluation():
     if os.environ.get("JANSEVA_COMPLAINT_EVALUATION") != "development" or not os.environ.get("EVALUATION_USER_ID") or not os.environ.get("EVALUATION_ACCESS_TOKEN"):
         raise RuntimeError("Evaluation requires an explicitly authorized development database, EVALUATION_USER_ID and EVALUATION_ACCESS_TOKEN; no data changed.")
@@ -345,9 +361,7 @@ def run_evaluation():
             })
             print(f"[{pair['id']}] Type: {pair['pair_type']} | Expected: {pair['expected']} -> Detected: {is_dup_detected} ({status})")
 
-    precision = (tp / (tp + fp)) * 100 if (tp + fp) else 100.0
-    recall = (tp / (tp + fn)) * 100 if (tp + fn) else 100.0
-    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 100.0
+    precision, recall, f1 = duplicate_metrics(tp, fp, fn)
     print(f"\nDuplicate Detection Precision: {precision:.1f}% | Recall: {recall:.1f}% | F1: {f1:.1f}%")
 
     report_data["duplicates"] = {
@@ -364,7 +378,7 @@ def run_evaluation():
     }
 
     # 3. RBAC & Security Matrix
-    print("\n--- 3. Running 8-Request Authentication & RBAC Audit ---")
+    print("\n--- 3. Planned Authentication & RBAC Checks (not executed) ---")
     security_cases = [
         {"test": "Anonymous complaint creation", "method": "POST", "url": "/api/complaints", "auth": None, "expected_status": 401, "actual_status": 401, "notes": "Missing Authorization header rejected."},
         {"test": "Citizen accessing complaints", "method": "GET", "url": "/api/complaints", "auth": "Citizen JWT", "expected_status": 200, "actual_status": 200, "notes": "Returns strictly citizen-owned records."},
@@ -453,7 +467,7 @@ def run_evaluation():
 ### Summary Metrics
 - **Overall Category Accuracy:** **{cat_accuracy:.1f}%** ({correct_cat}/{len(CLASSIFICATION_CASES)})
 - **Department Routing Accuracy:** **{dept_accuracy:.1f}%** ({correct_dept}/{len(CLASSIFICATION_CASES)})
-- **Fallback Behavior:** When external LLM is offline or unconfigured, the system uses deterministic bilingual scoring with 100% availability.
+- **Fallback Behavior:** These fixtures exercise deterministic keyword scoring; they do not measure service availability or general language accuracy.
 
 ---
 
@@ -480,7 +494,7 @@ def run_evaluation():
 | :--- | :--- | :---: | :---: | :---: | :--- |
 """
     for s in report_data["security_matrix"]:
-        md_content += f"| {s['test']} | `{s['method']} {s['url']}` | `{s['auth']}` | `{s['expected_status']}` | `{s['actual_status']}` | ✅ **PASS** — {s['notes']} |\n"
+        md_content += security_markdown_row(s)
 
     md_content += """
 ---
@@ -497,11 +511,11 @@ def run_evaluation():
 ---
 
 ## 5. Acceptance Gate Verification
-All empirical measurements required by Developer B Day 5 are completed and verified:
+This report records the classification, duplicate and latency measurements executed above. It does not certify live service readiness:
 - **Classification accuracy:** See the measured summary above for the 15 retained fixtures.
 - **Duplicate detection F1 score:** See the measured summary above for the 10 retained fixture pairs.
 - **Security matrix:** Planned cases only. Actual signed-JWT regression results must be recorded separately.
-- **Latency:** Sub-2ms p50 for health, sub-150ms p50 for live database queries.
+- **Latency:** See the measured table above; no fixed latency target is asserted as passed.
 """
 
     with open(out_md, "w", encoding="utf-8") as f:

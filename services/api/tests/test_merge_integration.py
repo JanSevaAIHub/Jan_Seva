@@ -54,3 +54,26 @@ def test_connected_evaluation_requires_explicit_operator_configuration(monkeypat
     monkeypatch.setattr(evaluate_complaints, 'get_engine', lambda: pytest.fail('Unconfigured evaluation must not access the database'))
     with pytest.raises(RuntimeError, match='explicitly authorized development'):
         evaluate_complaints.run_evaluation()
+
+
+@pytest.mark.parametrize('passed,label', [(None, 'NOT VERIFIED'), (True, 'PASS'), (False, 'FAIL')])
+def test_security_report_labels_only_measured_results(passed, label):
+    from app.scripts.evaluate_complaints import security_markdown_row
+    row = security_markdown_row({'test': 'Synthetic check', 'method': 'GET', 'url': '/api/me',
+        'auth': None, 'expected_status': 401, 'actual_status': None if passed is None else 401,
+        'passed': passed, 'notes': 'Run signed JWT tests separately.'})
+    assert f'**{label}**' in row
+    if passed is None:
+        assert '**PASS**' not in row and 'None' not in row
+
+
+@pytest.mark.parametrize('counts,expected', [
+    ((5, 0, 0), (100.0, 100.0, 100.0)),
+    ((0, 5, 5), (0.0, 0.0, 0.0)),
+    ((0, 0, 5), (0.0, 0.0, 0.0)),
+    ((0, 0, 0), (0.0, 0.0, 0.0)),
+    ((1, 1, 1), (50.0, 50.0, 50.0)),
+])
+def test_duplicate_metrics_never_reward_zero_correct_predictions(counts, expected):
+    from app.scripts.evaluate_complaints import duplicate_metrics
+    assert duplicate_metrics(*counts) == expected

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Complaint, ComplaintCategory, InternalStatus
+from app.ai.agent_schemas import ComplaintDraft
 from app.schemas import (
     ComplaintAnalyzeRequest,
     ComplaintAnalyzeResponse,
@@ -215,7 +216,7 @@ def find_duplicates(
 
 
 def analyze_complaint_submission(
-    db: Session, request: ComplaintAnalyzeRequest, *, verified_user_id: UUID | None = None
+    db: Session, request: ComplaintAnalyzeRequest | ComplaintDraft, *, verified_user_id: UUID | None = None
 ) -> ComplaintAnalyzeResponse:
     """End-to-end classification, department routing and duplicate search."""
     full_text = f"{request.title} {request.description}"

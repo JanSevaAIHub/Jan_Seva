@@ -36,6 +36,8 @@ export function Officer() {
   } = useApp()
 
   const [deptFilter, setDeptFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [localityFilter, setLocalityFilter] = useState('')
   const [timeFilter, setTimeFilter] = useState('All time')
 
   useEffect(() => { refreshComplaints() }, [])
@@ -51,6 +53,8 @@ export function Officer() {
   const days = timeFilter === 'Last 7 Days' ? 7 : timeFilter === 'Last 30 Days' ? 30 : Infinity
   const queue = currentUser.role === 'officer' ? complaints.filter(ticket =>
     (deptFilter === 'all' || ticket.categoryCode === deptFilter) &&
+    (statusFilter === 'all' || ticket.status === statusFilter) &&
+    ticket.locality.toLowerCase().includes(localityFilter.trim().toLowerCase()) &&
     Date.now() - new Date(ticket.created_at).getTime() <= days * 86400000) : []
   const countStatus = status => queue.filter(t => t.status === status).length
   const queueUnavailable = complaintsLoading || Boolean(complaintsError)
@@ -111,6 +115,7 @@ export function Officer() {
         {/* Right filter dropdowns */}
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Filter by category"
             value={deptFilter}
             onChange={e => setDeptFilter(e.target.value)}
             className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none shadow-sm"
@@ -122,6 +127,25 @@ export function Officer() {
             <option value="streetlight">Streetlight</option>
             <option value="other">Other</option>
           </select>
+
+          <select
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none shadow-sm"
+          >
+            <option value="all">All statuses</option>
+            {['DRAFT', 'LOCAL_SUBMITTED', 'UNDER_REVIEW', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED', 'REJECTED', 'REOPENED'].map(status => (
+              <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>
+            ))}
+          </select>
+          <input
+            aria-label="Filter by locality"
+            value={localityFilter}
+            onChange={e => setLocalityFilter(e.target.value)}
+            placeholder="Filter by locality"
+            className="min-w-0 max-w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm"
+          />
 
           <select
             value={timeFilter}
