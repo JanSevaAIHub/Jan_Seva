@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+from uuid import UUID
 from urllib.parse import urlsplit
 
 from sqlalchemy.engine import make_url
@@ -24,6 +25,19 @@ def safe_origin(value, allow_local=False):
 
 def configuration_issues(env, *, allow_local=False):
     issues = []
+    for flag in ('EVIDENCE_UPLOAD_ENABLED', 'DEMO_ASSIGNMENT_ENABLED'):
+        if env.get(flag, '').lower() not in ('', 'true', 'false'):
+            issues.append({'variable': flag, 'code': 'INVALID_BOOLEAN'})
+    if env.get('EVIDENCE_UPLOAD_ENABLED', '').lower() == 'true':
+        if not env.get('SUPABASE_SERVICE_ROLE_KEY', '').strip():
+            issues.append({'variable': 'SUPABASE_SERVICE_ROLE_KEY', 'code': 'MISSING'})
+        if env.get('SUPABASE_EVIDENCE_BUCKET', '') != 'janseva-complaint-evidence':
+            issues.append({'variable': 'SUPABASE_EVIDENCE_BUCKET', 'code': 'INVALID_PRIVATE_BUCKET_NAME'})
+    if env.get('DEMO_ASSIGNMENT_ENABLED', '').lower() == 'true':
+        try:
+            UUID(env.get('DEMO_DEFAULT_OFFICER_USER_ID', ''))
+        except ValueError:
+            issues.append({'variable': 'DEMO_DEFAULT_OFFICER_USER_ID', 'code': 'OFFICER_UUID_REQUIRED'})
     for name in ('DATABASE_URL', 'SUPABASE_URL', 'EMBEDDING_MODEL', 'EMBEDDING_DIMENSIONS', 'OPENAI_API_KEY', 'LLM_MODEL', 'CORS_ORIGINS'):
         if not env.get(name, '').strip():
             issues.append({'variable': name, 'code': 'MISSING'})

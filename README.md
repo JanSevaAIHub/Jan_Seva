@@ -2,6 +2,8 @@
 
 An independent citizen-assistance portfolio project: discover public schemes with cited evidence, create internal civic complaints, and review their history with an assigned officer. JanSeva does not file government grievances or verify government resolution.
 
+Production-readiness update (2026-11-14): signup display fields, authenticated private evidence images, retry-safe complaint creation and opt-in demo routing for new citizens are implemented. Migration **005** is required for this version, but has not been executed here. Storage and routing remain disabled by default. Read [the current production-readiness report](docs/final-production-readiness.md) and [private evidence setup](docs/private-evidence-and-release-setup.md) before configuring a development target. Live Supabase/PostgreSQL/Storage/provider acceptance remains pending.
+
 **Development status (2026-11-08): combined work stabilized locally; hosted integrations remain unverified.** This is a controlled demo candidate, not an approved public production release. See the current [stabilization report](docs/stabilization-report.md), [implementation status](docs/implementation-status.md), and historical [release review](docs/release-review.md).
 
 Phase 2 Scheme Navigator update (2026-11-09): the existing discovery screen now supports a tab-local editable profile, deterministic eligibility checks with exact values or ranges, source-evidence drawers, and search/filter/retry flows. Local integration is verified with isolated stored data; hosted services remain unverified. See [the Phase 2 report](docs/developer-a-phase-2-ui.md).
@@ -24,7 +26,7 @@ flowchart LR
     API -->|trusted JWKS| Auth
     API --> DB[(PostgreSQL / pgvector)]
     API --> Models[OpenAI embeddings / Responses]
-    DB --- Tables[profiles / schemes / scheme_chunks / complaints / complaint_events]
+    DB --- Tables[profiles / schemes / scheme_chunks / complaints / complaint_events / complaint_evidence]
 ```
 
 ## Installation
@@ -82,11 +84,11 @@ $env:PYTHONPATH = 'services/api'
 .\.venv\Scripts\python.exe -m app.scripts.evaluate_schemes
 ```
 
-Migration 001 creates tables, constraints and access policies; the same `app.scripts.migrate` command also applies migration 004 for optional filing channel/date metadata and migration 003 to widen existing complaint categories without deleting records. Migration 002 enables pgvector and vector metadata through `app.scripts.migrate_schemes`. Operators need the corresponding database privileges. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts twenty explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
+Migration 001 creates tables, constraints and access policies; the same `app.scripts.migrate` command also applies migration 003 to widen existing complaint categories, 004 for filing metadata, and **005** for private evidence metadata and submission keys. Migration 002 enables pgvector and vector metadata through `app.scripts.migrate_schemes`. Review the named development target, backup and execution approval before any migration. Setup provisions Arjun Mishra as citizen and R. Singh as officer using real Supabase IDs and database-controlled roles. Optional `app.scripts.seed_demo` inserts twenty explicitly synthetic complaints; new submissions do not require seeding. Never deploy the test-only server entrypoint.
 
 A verified first-time user now receives a server-owned citizen profile automatically; officer access still requires an operator-assigned database role. For the combined-branch audit, validation and operator helper instructions, see [docs/combined-work-review.md](docs/combined-work-review.md). Earlier phase documents are historical verification records.
 
-Only the configured demo citizen's **new** complaints are assigned to the configured officer. Both profiles must exist and the assignee must be an officer. Absent assignment leaves tickets unassigned; partial/invalid configuration fails closed. This grants no other user's access and does not reassign historical tickets.
+The configured citizen/officer pair retains its existing assignment behavior. To route **new citizens' new tickets** in an explicitly approved demo, set `DEMO_ASSIGNMENT_ENABLED=true` and `DEMO_DEFAULT_OFFICER_USER_ID` to the approved existing officer profile. Routing is server-controlled and disabled by default; invalid officer configuration fails closed. This never widens officer access, reassigns historical tickets or changes any profile's role. See the current setup guide for both modes.
 
 The checked-in corpus contains **12 schemes, 12 reviewed source notes and 12 current chunks**: the original eight plus PM-SYM and Ladakh-reviewed IGNOAPS, IGNWPS and IGNDPS. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
 

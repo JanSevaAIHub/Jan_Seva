@@ -34,7 +34,22 @@ from app.models import CORE_TABLES, Profile, Role, Scheme, SchemeChunk
 from app.ai.corpus import CHUNKING_VERSION, CORPUS, chunk_evidence, content_hash, read_corpus
 from app.ai import retrieval
 from app.ai.budget import ModelBudget
-from app.routers import schemes
+from app.routers import schemes, evidence
+
+# TEST DOUBLE: isolated private object bytes, never a Supabase Storage claim.
+class IsolatedEvidenceStorage:
+    def __init__(self):
+        self.objects = {}
+    def put(self, path, data, mime):
+        self.objects[path] = data
+    def read(self, path):
+        return self.objects[path]
+    def delete(self, path):
+        self.objects.pop(path, None)
+
+isolated_evidence = IsolatedEvidenceStorage()
+evidence.get_storage = lambda: isolated_evidence
+evidence.storage_access_guard = lambda db: None  # Explicit SQLite catalog double; live RLS is not verified.
 
 # Explicit TEST DOUBLE: bypass only the PostgreSQL catalog guard in isolated
 # SQLite. With no provider key, the real retrieve() uses real stored-text lexical
@@ -44,7 +59,7 @@ schemes.model_budget = ModelBudget(per_client=100, total=300)
 
 # The fake Auth endpoints also receive Supabase SDK headers (apikey, client info).
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5174"],
-    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"], allow_headers=["*"])
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["*"])
 
 key = ec.generate_private_key(ec.SECP256R1())
 jwk = jwt.algorithms.ECAlgorithm.to_jwk(key.public_key(), as_dict=True)
@@ -53,6 +68,8 @@ identities = {email: {"id": str(uuid4()), "email": email, "name": name, "role": 
     for email, name, role in [("arjun@example.test", "Arjun Mishra", Role.CITIZEN),
                                ("singh@example.test", "R. Singh", Role.OFFICER)]}
 os.environ["DEMO_CITIZEN_USER_ID"] = identities["arjun@example.test"]["id"]
+os.environ['DEMO_ASSIGNMENT_ENABLED'] = 'true'
+os.environ['DEMO_DEFAULT_OFFICER_USER_ID'] = identities['singh@example.test']['id']
 os.environ["DEMO_OFFICER_USER_ID"] = identities["singh@example.test"]["id"]
 password = os.environ["E2E_AUTH_PASSWORD"]
 refresh_tokens = {}
@@ -134,7 +151,7 @@ def auth_session(user):
     refresh_tokens[refresh] = user
     return {"access_token": token, "refresh_token": refresh, "token_type": "bearer", "expires_in": 3600,
         "expires_at": now + 3600, "user": {"id": user["id"], "email": user["email"], "aud": "authenticated",
-        "role": "authenticated", "created_at": datetime.now(timezone.utc).isoformat(), "app_metadata": {}, "user_metadata": {}}}
+        "role": "authenticated", "created_at": datetime.now(timezone.utc).isoformat(), "app_metadata": {}, "user_metadata": user.get('metadata', {})}}
 
 
 @app.post("/auth/v1/signup")
@@ -144,7 +161,7 @@ async def signup(request: Request):
     if email in identities:
         return JSONResponse(status_code=400, content={"code": "user_already_exists", "msg": "Already registered"})
     # Test-only Auth identity; the real /api/me provisions the application role.
-    user = {"id": str(uuid4()), "email": email, "name": "Citizen", "role": Role.CITIZEN, "password": data["password"]}
+    user = {"id": str(uuid4()), "email": email, "name": "Citizen", "role": Role.CITIZEN, "password": data["password"], 'metadata': data.get('data', {})}
     identities[email] = user
     if email.startswith("verify-"):
         return {"id": user["id"], "email": email, "identities": [], "created_at": datetime.now(timezone.utc).isoformat()}
@@ -167,7 +184,7 @@ def auth_identity(request):
 
 def user_json(user):
     return {"id": user["id"], "email": user["email"], "aud": "authenticated", "role": "authenticated",
-            "created_at": datetime.now(timezone.utc).isoformat(), "app_metadata": {}, "user_metadata": {}}
+            "created_at": datetime.now(timezone.utc).isoformat(), "app_metadata": {}, "user_metadata": user.get('metadata', {})}
 
 
 @app.get("/auth/v1/user")

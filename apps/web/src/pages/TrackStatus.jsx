@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
+import { ComplaintEvidence } from '../components/complaints/ComplaintEvidence'
 
 export function TrackStatus() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -133,6 +134,7 @@ export function TrackStatus() {
               </p>
             </div>
 
+            <ComplaintEvidence key={`${session?.user.id}:${selectedTicket.id}`} complaintId={selectedTicket.id} />
             <div className="grid grid-cols-2 gap-3 text-xs pt-1">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-[11px] text-slate-400 block mb-0.5">Officer assignment</span>

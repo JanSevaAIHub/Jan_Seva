@@ -85,6 +85,7 @@ export function ComplaintReviewModal() {
           </div>
 
           {/* Explicit Scope Guardrail Notice */}
+          {reviewModalComplaint.evidenceCount > 0 && <p className="text-xs text-slate-600">{reviewModalComplaint.evidenceCount} selected images will upload privately after the ticket is saved. Failed images can be retried without creating another ticket.</p>}
           <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-start gap-2.5">
             <ShieldAlert size={18} className="text-amber-600 flex-none mt-0.5" />
             <div className="text-[11px] text-amber-900 leading-relaxed">

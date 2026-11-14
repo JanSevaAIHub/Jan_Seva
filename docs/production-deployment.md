@@ -6,6 +6,8 @@ This document describes the production deployment architecture, step-by-step clo
 
 Prepared configuration only; no hosted deployment or live integration is certified by this guide. See [merge integration](merge-integration-2026-11-12.md) for reconciled contracts and verification.
 
+For the 2026-11-14 release, also review [private evidence and demo routing setup](private-evidence-and-release-setup.md) and [current readiness](final-production-readiness.md). The core migration runner now includes **005**, separately from vector migration 002. `SUPABASE_SERVICE_ROLE_KEY` is required server-side if private evidence is enabled; it remains optional when evidence and operator setup are unused. Neither bucket creation nor migrations run automatically.
+
 ## 1. Production Architecture Overview
 
 ```
@@ -111,6 +113,7 @@ After deployment, verify the live services using this 5-point checklist:
 4. **Complaint AI Analysis:**
    ```bash
    curl -i -X POST https://<your-backend>.onrender.com/api/complaints/analyze \
+     -H "Authorization: Bearer <citizen-access-token>" \
      -H "Content-Type: application/json" \
      -d '{"title": "Broken road with deep potholes", "description": "Road tar washed away", "locality": "Sector 4"}'
    # Expected: HTTP 200 with predicted category "road" and suggested department "Roads & Transport Dept".

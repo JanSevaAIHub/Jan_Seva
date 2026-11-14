@@ -5,6 +5,26 @@ import { apiRequest, publicApiRequest, getHealth, onUnauthorized } from '../src/
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
 
+test('binary evidence and authenticated image reads share the bearer boundary', async () => {
+  const file = new Blob(['synthetic pixels'], { type: 'image/png' })
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer test-access-token')
+    if (options.method === 'POST') {
+      assert.equal(options.body, file)
+      assert.equal(options.headers['Content-Type'], 'image/png')
+      assert.equal(options.headers['Idempotency-Key'], 'stable-key')
+      return Response.json({ state: 'READY' })
+    }
+    return new Response(file, { headers: { 'Content-Type': 'image/png' } })
+  }
+  await apiRequest('/complaints/id/evidence', 'test-access-token', { method: 'POST', body: file, headers: { 'Idempotency-Key': 'stable-key' } })
+  const result = await apiRequest('/complaints/id/evidence/image/content', 'test-access-token', { responseType: 'blob' })
+  assert.equal(await result.text(), 'synthetic pixels')
+  // A 204 deletion does not require a JSON response body.
+  globalThis.fetch = async () => new Response(null, { status: 204 })
+  assert.equal(await apiRequest('/complaints/id/evidence/image', 'test-access-token', { method: 'DELETE' }), null)
+})
+
 test('one transport sends JSON and the actual bearer token for POST and PATCH', async () => {
   const calls = []
   globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return Response.json({ id: 'saved-ticket' }) }

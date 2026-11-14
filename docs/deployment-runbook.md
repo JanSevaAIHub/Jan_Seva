@@ -1,5 +1,7 @@
 # JanSeva integration and deployment runbook
 
+Current release supplement (2026-11-14): [private evidence and release setup](private-evidence-and-release-setup.md). The core runner now applies **001/003/004/005** in one transaction and validates six application tables. Vector migration **002** remains separate. Earlier counts/missing-variable observations below are historical. The existing target/backup/review/approval gates still apply; no migration or storage setup was executed by this update.
+
 2026-11-11. Preparation only: no hosted resources were created and no public URLs are assumed. Use the existing authorized Supabase project and approved hosting accounts. Do not paste private credentials into chat. Keep them in ignored local files or the host's secret settings.
 
 ## 1. Configure the existing project privately

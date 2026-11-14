@@ -3,6 +3,7 @@ import { X, ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, UserChe
 import { useApp } from '../../context/AppContext'
 import { NEXT_STATUS } from '../../lib/complaints'
 import { useDialog } from '../../lib/useDialog'
+import { ComplaintEvidence } from '../complaints/ComplaintEvidence'
 
 export function TicketDetailModal() {
   const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus } = useApp()
@@ -80,6 +81,7 @@ export function TicketDetailModal() {
             </div>
           </div>
 
+          <ComplaintEvidence key={officerTicketModal.id} complaintId={officerTicketModal.id} />
           {/* Timeline / Audit trail */}
           <div>
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Audit History</div>

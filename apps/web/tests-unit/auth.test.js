@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createCitizenAccount, sendResetEmail, changePassword, friendlyAuthError } from '../src/lib/auth.js'
+import { createCitizenAccount, citizenProfile, sendResetEmail, changePassword, friendlyAuthError } from '../src/lib/auth.js'
 
 test('signup sends credentials and fixed callback without roles or identity metadata', async () => {
   let request
@@ -13,6 +13,16 @@ test('signup sends credentials and fixed callback without roles or identity meta
 test('signup also handles providers with email confirmation disabled', async () => {
   const result = await createCitizenAccount({ auth: { signUp: async () => ({ data: { session: {} } }) } }, 'user@example.test', 'test-password', 'https://janseva.example')
   assert.equal(result.signedIn, true)
+})
+
+test('signup metadata includes only permitted display fields and cannot assign a role', async () => {
+  let request
+  const client = { auth: { signUp: async data => { request = data; return { data: {} } } } }
+  await createCitizenAccount(client, 'user@example.test', 'test-password', 'https://janseva.example',
+    { name: ' New Citizen ', state: 'Punjab', occupation: 'Farmer', role: 'officer', user_id: 'foreign' })
+  assert.deepEqual(request.options.data, { name: 'New Citizen', state: 'Punjab', occupation: 'Farmer' })
+  assert.throws(() => citizenProfile({ name: ' ' }))
+  assert.throws(() => citizenProfile({ name: 'Citizen', state: 'P' }))
 })
 test('recovery uses fixed same-origin redirect and an enumeration-safe notice', async () => {
   let request

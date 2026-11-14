@@ -13,12 +13,24 @@ function credentials(email, password) {
   if (password != null && password.length < 8) throw new Error('Password must contain at least 8 characters.')
 }
 
-export async function createCitizenAccount(client, email, password, origin) {
+export function citizenProfile(fields) {
+  const name = fields.name?.trim()
+  if (!name || name.length > 120 || name.includes('\0')) throw new Error('Enter a name of at most 120 characters.')
+  const result = { name }
+  for (const field of ['state', 'occupation']) {
+    const value = fields[field]?.trim()
+    if (value && (value.length < 2 || value.length > 100 || value.includes('\0'))) throw new Error('Optional profile fields must contain 2–100 characters.')
+    if (value) result[field] = value
+  }
+  return result
+}
+
+export async function createCitizenAccount(client, email, password, origin, fields) {
   credentials(email, password)
   // No role or user-supplied identity is sent. FastAPI provisions a citizen
   // profile only after independently verifying the provider-issued JWT.
   const { data, error } = await client.auth.signUp({ email: email.trim(), password,
-    options: { emailRedirectTo: `${origin}/auth/callback` } })
+    options: { emailRedirectTo: `${origin}/auth/callback`, ...(fields ? { data: citizenProfile(fields) } : {}) } })
   if (error) throw error
   return { signedIn: Boolean(data?.session), message: data?.session
     ? 'Your account is ready.' : 'Check your email for a confirmation link if registration is available for this address. Then sign in.' }

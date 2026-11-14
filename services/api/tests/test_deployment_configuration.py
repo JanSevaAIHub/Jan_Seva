@@ -46,6 +46,13 @@ def test_loopback_configuration_requires_explicit_local_mode():
     assert configuration_issues(env, allow_local=True) == []
 
 
+def test_evidence_and_demo_routing_opt_in_require_server_only_configuration():
+    issues = configuration_issues({**READY, 'EVIDENCE_UPLOAD_ENABLED': 'true', 'DEMO_ASSIGNMENT_ENABLED': 'true'})
+    assert {i['variable'] for i in issues} == {'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_EVIDENCE_BUCKET', 'DEMO_DEFAULT_OFFICER_USER_ID'}
+    assert configuration_issues({**READY, 'EVIDENCE_UPLOAD_ENABLED': 'false', 'DEMO_ASSIGNMENT_ENABLED': 'false'}) == []
+    assert configuration_issues({**READY, 'EVIDENCE_UPLOAD_ENABLED': 'maybe'})
+
+
 def test_netlify_rewrites_spa_and_checks_public_environment_before_build():
     config = tomllib.loads((ROOT / 'netlify.toml').read_text())
     assert config['build']['base'] == 'apps/web'

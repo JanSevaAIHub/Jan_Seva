@@ -9,6 +9,9 @@ export function LoginModal() {
     authMode: mode, setAuthMode, clearAuthError, authError, authBusy } = useApp()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [state, setState] = useState('')
+  const [occupation, setOccupation] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [notice, setNotice] = useState('')
@@ -16,7 +19,7 @@ export function LoginModal() {
   const pending = useRef(false)
   const close = () => { if (!pending.current) { setLoginRole(null); setAuthMode('login') } }
   const dialogRef = useDialog(Boolean(loginRole), close, authBusy)
-  useEffect(() => { setEmail(''); setPassword(''); setConfirm(''); setNotice(''); setValidation('') }, [loginRole])
+  useEffect(() => { setName(''); setState(''); setOccupation(''); setEmail(''); setPassword(''); setConfirm(''); setNotice(''); setValidation('') }, [loginRole])
   if (!loginRole) return null
   const changeMode = value => { setAuthMode(value); clearAuthError(); setNotice(''); setValidation(''); setPassword(''); setConfirm('') }
   const submit = async event => {
@@ -29,7 +32,7 @@ export function LoginModal() {
       if (mode === 'login') {
         if (await signIn(email.trim(), password)) { setPassword(''); setLoginRole(null) }
       } else {
-        const result = mode === 'signup' ? await signUp(email, password)
+        const result = mode === 'signup' ? await signUp(email, password, { name, state, occupation })
           : mode === 'forgot' ? await requestPasswordReset(email) : await resetPassword(password)
         if (result) {
           setNotice(result.message); setPassword(''); setConfirm('')
@@ -50,6 +53,17 @@ export function LoginModal() {
           <button type="button" aria-label="Close sign in" disabled={authBusy} onClick={close}><X size={18} /></button>
         </div>
         <p className="text-xs text-slate-500">{loginRole === 'officer' ? 'Officer access requires an operator-assigned account.' : 'Create an account to save and revisit your complaints. New accounts receive citizen access.'}</p>
+        {mode === 'signup' && <>
+          <label className="block text-xs font-semibold">Name
+            <input required maxLength={120} autoComplete="name" disabled={authBusy} value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
+          </label>
+          <label className="block text-xs font-semibold">State (optional)
+            <input minLength={2} maxLength={100} disabled={authBusy} value={state} onChange={e => setState(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
+          </label>
+          <label className="block text-xs font-semibold">Occupation (optional)
+            <input minLength={2} maxLength={100} disabled={authBusy} value={occupation} onChange={e => setOccupation(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
+          </label>
+        </>}
         {mode !== 'reset' && <label className="block text-xs font-semibold">Email
           <input type="email" autoComplete="username" required maxLength={254} disabled={authBusy} value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
         </label>}

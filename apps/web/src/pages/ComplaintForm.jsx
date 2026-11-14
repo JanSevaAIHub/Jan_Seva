@@ -20,8 +20,8 @@ import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 import { CATEGORY_LABELS } from '../lib/complaints'
 import { apiRequest } from '../lib/api'
+import { ComplaintEvidence, EvidencePicker, useEvidenceConfiguration } from '../components/complaints/ComplaintEvidence'
 
-const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
 
 export function ComplaintForm() {
   const navigate = useNavigate()
@@ -36,7 +36,7 @@ export function ComplaintForm() {
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
   const [createdTicket, setCreatedTicket] = useState(null)
-  useEffect(() => { setCreatedTicket(null) }, [session?.user.id])
+  useEffect(() => { setCreatedTicket(null); setEvidenceFiles([]); submissionAttempt.current = null }, [session?.user.id])
   
   // Form fields
   const [title, setTitle] = useState('')
@@ -44,7 +44,9 @@ export function ComplaintForm() {
   const [description, setDescription] = useState('')
   const [locality, setLocality] = useState('')
   const [priority, setPriority] = useState('Medium')
-  const [hasPhoto, setHasPhoto] = useState(false)
+  const [evidenceFiles, setEvidenceFiles] = useState([])
+  const evidenceEnabled = useEvidenceConfiguration()
+  const submissionAttempt = useRef(null)
   const [aiDetected, setAiDetected] = useState(false)
   const [analysis, setAnalysis] = useState(null)
   const [analysisBusy, setAnalysisBusy] = useState(false)
@@ -88,7 +90,7 @@ export function ComplaintForm() {
   const suggestedDept = (analysis || automaticAnalysis)?.suggested_department || ''
   const analyzing = analysisBusy || autoAnalyzing
 
-  const handleTitleChange = val => { setTitle(val); setAnalysis(null); setAiDetected(false) }
+  const handleTitleChange = val => { if (createdTicket && !evidenceFiles.length) setCreatedTicket(null); setTitle(val); setAnalysis(null); setAiDetected(false) }
   const analyzeComplaint = async () => {
     if (analysisBusy) return
     const version = ++analysisVersion.current
@@ -105,12 +107,18 @@ export function ComplaintForm() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (createdTicket && evidenceFiles.length) {
+      addToast('Your ticket is saved. Retry or remove its pending images below before starting another complaint.', 'info')
+      return
+    }
     if (!title.trim() || !description.trim()) {
       addToast('Please enter both title and description', 'warning')
       return
     }
 
-    // Open the Review Modal before committing!
+    const fingerprint = JSON.stringify([title, description, category, locality])
+    if (submissionAttempt.current?.fingerprint !== fingerprint) submissionAttempt.current = { fingerprint, key: crypto.randomUUID() }
+    // Keep one key for retries after an ambiguous network failure.
     setReviewModalComplaint({
       title,
       category,
@@ -118,13 +126,12 @@ export function ComplaintForm() {
       locality,
       priority,
       department: analysis?.suggested_department || 'Confirm the responsible authority for this locality',
-      evidenceCount: 0,
+      evidenceCount: evidenceFiles.length,
+      submissionKey: submissionAttempt.current.key,
       onSuccess: (savedTicket) => {
         setCreatedTicket(savedTicket)
-        setTitle('')
-        setDescription('')
-        setLocality('')
-        setHasPhoto(false)
+        submissionAttempt.current = null
+        if (!evidenceFiles.length) { setTitle(''); setDescription(''); setLocality('') }
         setAiDetected(false)
       }
     })
@@ -251,8 +258,8 @@ export function ComplaintForm() {
               </label>
               <button
                 type="button"
-                disabled={analysisBusy}
-                onClick={() => { setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false); setAnalysis(null) }}
+                disabled={analysisBusy || (Boolean(createdTicket) && evidenceFiles.length > 0)}
+                onClick={() => { setCreatedTicket(null); setTitle('[SYNTHETIC] Streetlight needs repair'); setDescription('Synthetic demonstration only: a streetlight requires internal review.'); setLocality('[SYNTHETIC] Test Ward'); setCategory('Streetlight & Public Lighting'); setAiDetected(false); setAnalysis(null) }}
                 className="text-[10px] text-violet-600 hover:underline"
               >
                 Load sample
@@ -395,50 +402,12 @@ export function ComplaintForm() {
           </div>
 
           <p className="text-[11px] text-slate-500">Priority and response-time estimates are not assessed or saved in this phase.</p>
-          {/* Upload Evidence */}
-          <div>
-            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
-              Upload Evidence
-            </label>
-            <div className="flex items-center gap-3">
-              {hasPhoto ? (
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group">
-                  <img
-                    src={SAMPLE_PHOTO_PREVIEW}
-                    alt="Evidence preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHasPhoto(false)
-                      addToast('Sample preview hidden. No attachment was uploaded.', 'info')
-                    }}
-                    className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHasPhoto(true)
-                    addToast('Sample preview only; attachments are not uploaded in this phase.', 'info')
-                  }}
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 hover:border-violet-400 flex flex-col items-center justify-center text-slate-400 hover:text-violet-600 transition-colors"
-                >
-                  <Upload size={18} />
-                  <span className="text-[9px] font-bold mt-1">Preview</span>
-                </button>
-              )}
-
-              <div className="text-xs text-slate-500 leading-relaxed">
-                <div>Sample preview only; attachments are not saved.</div>
-                <div className="text-[11px] text-slate-400">Location is stored as the locality text you enter.</div>
-              </div>
-            </div>
-          </div>
+          {!createdTicket && <div>
+            <EvidencePicker selection={evidenceFiles} onChange={setEvidenceFiles} disabled={!session || !evidenceEnabled} />
+            {!evidenceEnabled && <p className="text-xs text-slate-500">Image uploads are disabled until private storage is configured.</p>}
+          </div>}
+          {createdTicket && <ComplaintEvidence key={`${session?.user.id}:${createdTicket.id}`} complaintId={createdTicket.id} initialFiles={evidenceFiles}
+            onUploaded={() => { setEvidenceFiles([]); setTitle(''); setDescription(''); setLocality('') }} />}
 
           {/* Similar Complaints (AI Suggestion Alert) */}
           {duplicateMatches.length > 0 ? (

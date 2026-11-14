@@ -4,7 +4,7 @@ import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
 import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
 import { complaintInput, complaintView } from '../lib/complaints'
 import { agentReply } from '../lib/agent'
-import { createCitizenAccount, sendResetEmail, changePassword, friendlyAuthError } from '../lib/auth'
+import { createCitizenAccount, citizenProfile, sendResetEmail, changePassword, friendlyAuthError } from '../lib/auth'
 
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
@@ -240,8 +240,15 @@ export function AppProvider({ children }) {
     setComplaintsLoading(true)
     setComplaintsError('')
     try {
-      const profile = await apiRequest('/me', session.access_token)
+      let profile = await apiRequest('/me', session.access_token)
       if (!isCurrent()) return
+      // Only permitted display fields are copied from signup metadata. Identity
+      // and role always come from the independently authenticated backend.
+      if (profile?.name === 'Citizen' && session.user.user_metadata?.name) {
+        const fields = citizenProfile(session.user.user_metadata)
+        profile = await apiRequest('/me', session.access_token, { method: 'PATCH', body: fields })
+        if (!isCurrent()) return
+      }
       if (!profile || typeof profile.name !== 'string' || typeof profile.user_id !== 'string' ||
         (profile.occupation != null && typeof profile.occupation !== 'string') ||
         !['citizen', 'officer'].includes(profile.role)) throw new Error('The API returned an invalid profile. Please retry.')
@@ -301,6 +308,7 @@ export function AppProvider({ children }) {
     try {
       const saved = await apiRequest('/complaints', session?.access_token, {
         method: 'POST', body: JSON.stringify(complaintInput(draft)),
+        ...(draft.submissionKey ? { headers: { 'Idempotency-Key': draft.submissionKey } } : {}),
       })
       if (version !== identityVersion.current) return null
       const ticket = applyComplaint(saved)
@@ -439,7 +447,7 @@ export function AppProvider({ children }) {
     } catch (error) { setAuthError(friendlyAuthError(error)); return null }
     finally { setAuthBusy(false) }
   }
-  const signUp = (email, password) => runAuthAction(() => createCitizenAccount(supabase, email, password, window.location.origin))
+  const signUp = (email, password, fields) => runAuthAction(() => createCitizenAccount(supabase, email, password, window.location.origin, fields))
   const requestPasswordReset = email => runAuthAction(() => sendResetEmail(supabase, email, window.location.origin))
   const resetPassword = password => runAuthAction(() => changePassword(supabase, password))
   const signOut = async () => {

@@ -43,6 +43,21 @@ class Profile(APIModel):
     occupation: str | None = Field(default=None, max_length=100)
 
 
+class ProfileUpdate(APIModel):
+    name: str = Field(min_length=1, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=100)
+    occupation: str | None = Field(default=None, min_length=2, max_length=100)
+
+
+class EvidenceSummary(APIModel):
+    id: UUID
+    complaint_id: UUID
+    state: Literal['PENDING', 'READY', 'DELETE_PENDING']
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+
 class Scheme(APIModel):
     id: UUID
     title: str = Field(min_length=1, max_length=250)

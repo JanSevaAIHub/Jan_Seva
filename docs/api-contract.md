@@ -1,6 +1,20 @@
 # API contract — Day 1 shared boundary
 
-Base path: `/api`. JSON requests and responses. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
+Base path: `/api`. JSON requests and responses, except the image upload/content endpoints documented below. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
+
+## 2026-11-14 additive release contracts
+
+Requires reviewed migration 005; no migration is executed on startup.
+
+- `PATCH /me`: authenticated `{name, state?, occupation?}` only; `name` 1–120 characters, optional fields 2–100 characters or null. No role/user-ID updates. Signup carries only permitted display metadata through Supabase email confirmation; the client persists it through this authenticated route after `/me` provisions the citizen. Profile-save failures are shown with retry, not reported as successful persistence.
+- `POST /complaints`: unchanged JSON schema; optional UUID `Idempotency-Key` header. Same user/key/body returns the already saved ticket with one initial event; changed body returns 409. Keys are scoped per citizen. Clients without a key retain distinct-create behavior. The browser keeps its attempt key while retrying the same draft, including an ambiguous network failure.
+- `GET /evidence/config`: public capability/size/count/type metadata only. Uploads disabled by default; no bucket creation or credentials returned.
+- `GET /complaints/{id}/evidence`: authenticated owner or assigned officer; array `{id, complaint_id, state, content_type, size_bytes, created_at}`. Includes pending operations honestly; never exposes object paths or storage credentials.
+- `POST /complaints/{id}/evidence`: citizen owner only. **Raw file bytes**, `Content-Type: image/jpeg|image/png|image/webp`, required UUID `Idempotency-Key`. Maximum 5 MiB and three pending/ready attachments. Actual file decoding, format/MIME agreement, single-frame and pixel limits are enforced; pixels are re-encoded to remove EXIF/GPS and trailing payloads. Returns 201 evidence metadata.
+- `GET /complaints/{id}/evidence/{evidenceId}/content`: owner/assigned officer; authenticated raster bytes, `Cache-Control: private, no-store`, `nosniff`. Every read re-verifies JWT/ownership/assignment. **No public or signed image URLs** are issued; the frontend uses revocable in-memory blob URLs after authenticated fetch. Expired bearer tokens return 401.
+- `DELETE /complaints/{id}/evidence/{evidenceId}`: citizen owner only, 204. Officers cannot upload/delete. Delete is retryable; object removal precedes metadata removal. A failed delete remains `DELETE_PENDING` and is not viewable.
+
+`PENDING` is committed before remote uploads. A timeout or database failure after a storage write leaves a tracked path for retry/removal, not a falsely ready record. Upload retries with the same key/content reuse that record; different content is 409. Count reservations use a complaint lock and database slot uniqueness. Storage and PostgreSQL cannot commit atomically; incomplete operations deliberately remain visible until reconciled. See [setup and recovery](private-evidence-and-release-setup.md).
 
 Registered routes include `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`. Phase 3 adds `POST /agent/message`. Complaint analysis uses the shared read-only deterministic service described in the 2026-11-10 update below. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
 

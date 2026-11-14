@@ -24,3 +24,12 @@ def test_only_configured_local_origins_receive_cors_permission(origin, expected)
         assert response.headers["access-control-allow-credentials"] == "true"
     else:
         assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize('method', ['POST', 'DELETE'])
+def test_evidence_and_idempotent_requests_have_allowed_preflight(method):
+    with TestClient(app) as client:
+        result = client.options('/api/complaints/example/evidence', headers={
+            'Origin': 'http://localhost:5173', 'Access-Control-Request-Method': method,
+            'Access-Control-Request-Headers': 'authorization,content-type,idempotency-key'})
+    assert result.status_code == 200

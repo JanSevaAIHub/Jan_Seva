@@ -2,7 +2,9 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.ai.complaint_classifier import analyze_complaint_submission
@@ -24,6 +26,17 @@ def analyze_complaint(data: ComplaintAnalyzeRequest, user: Profile = Depends(req
 def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
     settings = get_settings()
     citizen_id, officer_id = settings.demo_citizen_user_id, settings.demo_officer_user_id
+    # Explicit server-side demo routing for newly registered citizens. The
+    # existing citizen/officer pair takes precedence when it is configured.
+    if settings.demo_assignment_enabled and (not citizen_id or str(citizen.user_id) != citizen_id):
+        try:
+            default_id = UUID(settings.demo_default_officer_user_id)
+        except ValueError:
+            raise HTTPException(503, detail={'code': 'ASSIGNMENT_NOT_CONFIGURED', 'message': 'Configure the approved demo officer before enabling demo assignment.'}) from None
+        officer = db.get(Profile, default_id)
+        if officer is None or officer.role != Role.OFFICER:
+            raise HTTPException(503, detail={'code': 'ASSIGNMENT_NOT_CONFIGURED', 'message': 'The approved demo officer needs an officer profile.'})
+        return default_id
     if not citizen_id and not officer_id:
         return None
     try:
@@ -39,13 +52,33 @@ def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
 
 
 @router.post("", response_model=ComplaintDetail, status_code=201)
-def create_complaint(data: ComplaintCreate, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
+def create_complaint(data: ComplaintCreate, user: Profile = Depends(require_citizen), db: Session = Depends(get_db),
+                     idempotency_key: UUID | None = Header(default=None)):
+    def existing_submission():
+        saved = db.scalar(select(Complaint).where(Complaint.user_id == user.user_id, Complaint.submission_key == idempotency_key))
+        if saved is not None and any(getattr(saved, name) != value for name, value in data.model_dump().items()):
+            raise HTTPException(409, detail={'code': 'SUBMISSION_CONFLICT', 'message': 'This submission attempt already saved different details. Open My Requests before submitting again.'})
+        return saved
+
+    if idempotency_key is not None:
+        saved = existing_submission()
+        if saved is not None:
+            return saved
     complaint = Complaint(**data.model_dump(), user_id=user.user_id,
+                          submission_key=idempotency_key,
                           assigned_officer_id=demo_assignee(db, user), status=InternalStatus.LOCAL_SUBMITTED)
     complaint.events.append(ComplaintEvent(actor_id=user.user_id, old_status=None,
         new_status=InternalStatus.LOCAL_SUBMITTED, note="Citizen created an internal JanSeva ticket; no government filing."))
     db.add(complaint)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if idempotency_key is not None:
+            saved = existing_submission()
+            if saved is not None:
+                return saved
+        raise
     db.refresh(complaint)
     return complaint
 

@@ -30,3 +30,11 @@ services:
         value: "0.35"
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: EVIDENCE_UPLOAD_ENABLED
+        value: "false"
+      - key: SUPABASE_EVIDENCE_BUCKET
+        sync: false
+      - key: DEMO_ASSIGNMENT_ENABLED
+        value: "false"
+      - key: DEMO_DEFAULT_OFFICER_USER_ID
+        sync: false
