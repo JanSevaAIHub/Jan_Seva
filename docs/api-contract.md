@@ -8,8 +8,10 @@ Updated 2026-11-19. Base path: `/api`. JSON responses and JSON request bodies ex
 | `GET /me` | Authenticated server-owned `{user_id, name, role, state, occupation}` |
 | `GET /schemes` | Optional `query` (3-1000 chars), `state`, `category`, `limit` (1-50), `search_mode=semantic|keyword`. Default semantic; UI explicitly requests keyword search, which needs no model. Returns stored `SchemeCard[]`; state includes national records. |
 | `POST /schemes/ask` | `{message, profile?: {state?, occupation?}, state?, category?, history?: string[]}`. At most five prior user questions, each 1-1000 chars. Returns `{answer, citations, tool_trace, mode}`. |
-| `POST /schemes/eligibility` | `{scheme_id: UUID, profile: EligibilityProfile}`. Returns `{scheme_id, title, status, reasons, missing_fields, notice, source_url, reviewed_at}`. No LLM. |
-| `POST /agent/message` | `{message, profile?: {state?, occupation?}, history?: [{role: "user"|"assistant", content}]}`. Max ten turns, each 1-5000 chars. Returns `{intent, answer, citations, tool_trace, mode, complaint}`. No writes. |
+| `POST /schemes/screen` | `{scheme_id: UUID, profile: EligibilityProfile}`. Returns `{scheme_id, title, status, reasons, missing_fields, notice, source_url, reviewed_at}`. No LLM. |
+| `POST /agent/conversation` | `{message, profile?: {state?, occupation?}, history?: [{role: "user"|"assistant", content}]}`. Max ten turns, each 1-5000 chars. Returns `{intent, answer, citations, tool_trace, mode, complaint}`. No writes. |
+| `POST /agent/message` | LangGraph navigator: `{message, session_id?, profile?, scheme_id?, complaint?}` -> `{session_id, intent, response, status, citations, actions, tool_trace, eligibility}`. Intent uses `clarify`; action paths are allowlisted and complaint actions require review. |
+| `POST /schemes/eligibility` | Stored evidence-backed rules: `{scheme_id, profile}` -> `{scheme_id, status, matched_rules, missing_fields, reasons, citations}`. Profile supports exact values/ranges, income periods and source-backed conditions. |
 | `POST /complaints/analyze` | Citizen only: `{title, description, locality}`. Returns `{category, draft, department, next_action, mode, notice, similar_complaints, similarity_note}`. Similarity considers only the caller's latest 100 tickets. |
 | `POST /complaints` | Citizen explicitly confirms `{title, description, category, locality}`. Optional UUID `Idempotency-Key` header. Returns 201 `ComplaintDetail`; same owner/key/payload replays the same ticket, changed payload returns 409. |
 | `GET /complaints` | Owner/assigned-officer scope. Optional `status`, `limit` (1-100, default 100), `offset` (0-100000). Returns `ComplaintDetail[]`. UI bounds loaded history at 1,000 and labels that limit. |
@@ -37,3 +39,8 @@ Updated 2026-11-19. Base path: `/api`. JSON responses and JSON request bodies ex
 - Browser CORS accepts only configured origins and supports `Authorization`, `Content-Type`, `Idempotency-Key`, `X-Filename`.
 
 The SQL migration is reviewed code, not evidence of a hosted schema. Apply only to an explicitly verified development project with approval and backup/recovery arrangements. See [final release verification](FINAL-JANSEVA-BUG-FIX-REPORT.md).
+
+
+## Main-branch integration
+
+The richer homepage LangGraph navigator keeps the Developer A `/agent/message` request/response contract (session UUID, structured profile, scheme selection, explicit draft proposal, `response`, `actions`, `eligibility` and `tool_trace`). The focused citizen composer contract documented above is available at `/agent/conversation`. Stored evidence-backed rules use `/schemes/eligibility`; the eight-record limited quick-check contract above is preserved at `/schemes/screen`. See [Developer A API details](developer-a-phase-2-ui.md) and [agent handoff](dev-a-day1-handoff.md). No mutation tool is added.

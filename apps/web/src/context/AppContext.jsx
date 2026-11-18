@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase, authConfigurationError } from '../lib/supabase'
 import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
-import { schemeView, schemeAnswer } from '../lib/schemes'
+import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
+import { agentReply } from '../lib/agent'
 import { complaintInput, complaintView, ticketNotifications, DEPARTMENTS } from '../lib/complaints'
 
 const AppContext = createContext(null)
@@ -23,7 +24,7 @@ export function AppProvider({ children }) {
   const sessionUser = useRef(null)
   const sessionToken = useRef(undefined)
   const [selectedState, setSelectedState] = useState('Punjab')
-  
+
   // Schemes state
   const [schemes, setSchemes] = useState([])
   const [savedSchemeIds, setSavedSchemeIds] = useState([])
@@ -32,7 +33,50 @@ export function AppProvider({ children }) {
   const [schemeSearchQuery, setSchemeSearchQuery] = useState('')
   const [selectedSectorFilter, setSelectedSectorFilter] = useState('All')
   const [selectedTargetFilter, setSelectedTargetFilter] = useState('All')
-  
+
+  const [schemeProfile, setSchemeProfile] = useState({})
+  const schemeProfileRef = useRef({})
+  const profileVersion = useRef(0)
+  const eligibilityRequests = useRef(new Set())
+  const [eligibility, setEligibility] = useState({})
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [activeCitation, setActiveCitation] = useState(null)
+
+  const updateSchemeProfile = useCallback(profile => {
+    profileVersion.current += 1
+    schemeProfileRef.current = profile
+    setSchemeProfile(profile)
+    setEligibility({})
+  }, [])
+
+  const clearSchemeProfile = useCallback(() => {
+    updateSchemeProfile({})
+    setProfileEditing(false)
+    setActiveCitation(null)
+    setActiveSchemeModal(null)
+  }, [updateSchemeProfile])
+
+  // Same JSON/auth transport as the rest of the app; public browsing also works.
+  const schemeApiRequest = useCallback((path, options) => sessionToken.current
+    ? apiRequest(path, sessionToken.current, options) : publicApiRequest(path, options), [])
+
+  const checkEligibility = async scheme => {
+    const version = profileVersion.current
+    const requestKey = `${version}:${scheme.id}`
+    if (eligibilityRequests.current.has(requestKey)) return
+    eligibilityRequests.current.add(requestKey)
+    setEligibility(prev => ({ ...prev, [scheme.id]: { loading: true, error: '', result: null } }))
+    try {
+      const reply = await schemeApiRequest('/schemes/eligibility', {
+        method: 'POST', body: { scheme_id: scheme.id, profile: schemeProfileRef.current },
+      })
+      const result = eligibilityResult(reply, scheme)
+      if (version === profileVersion.current) setEligibility(prev => ({ ...prev, [scheme.id]: { loading: false, error: '', result } }))
+    } catch (error) {
+      if (version === profileVersion.current) setEligibility(prev => ({ ...prev, [scheme.id]: { loading: false, error: error.message, result: null } }))
+    } finally { eligibilityRequests.current.delete(requestKey) }
+  }
+
   // Complaints state
   const [complaints, setComplaints] = useState([])
   const [activeComplaint, setActiveComplaint] = useState(null)
@@ -58,7 +102,7 @@ export function AppProvider({ children }) {
 
   // Notifications state
   const [notifications, setNotifications] = useState([])
-  
+
   // Toast notifications
   const toastIds = useRef(0)
   const [toasts, setToasts] = useState([])
@@ -73,25 +117,45 @@ export function AppProvider({ children }) {
   const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
   const [schemeChatDraft, setSchemeChatDraft] = useState('')
+  const [citizenMessages, setCitizenMessages] = useState([])
+  const [citizenDraft, setCitizenDraft] = useState('')
+  const [citizenError, setCitizenError] = useState('')
+  const [citizenTyping, setCitizenTyping] = useState(false)
+  const citizenBusy = useRef(false)
+
   const [agentMessages, setAgentMessages] = useState([])
-  const [agentDraft, setAgentDraft] = useState('')
   const [agentError, setAgentError] = useState('')
   const [agentTyping, setAgentTyping] = useState(false)
+  const [agentComplaintDraft, setAgentComplaintDraft] = useState(null)
   const agentBusy = useRef(false)
+  const agentVersion = useRef(0)
+  const agentSession = useRef(null)
+  const agentMessageId = useRef(0)
+
+  const clearAgentChat = useCallback(() => {
+    agentVersion.current += 1
+    agentBusy.current = false
+    agentSession.current = null
+    setAgentMessages([])
+    setAgentError('')
+    setAgentTyping(false)
+    setAgentComplaintDraft(null)
+  }, [])
 
   const clearSchemeChat = useCallback(() => {
+    clearAgentChat()
     schemeChatVersion.current += 1
     schemeChatBusy.current = false
     setChatMessages([])
     setSchemeChatError('')
     setIsAiTyping(false)
     setSchemeChatDraft('')
-    setAgentMessages([])
-    setAgentDraft('')
-    setAgentError('')
-    setAgentTyping(false)
-    agentBusy.current = false
-  }, [])
+    setCitizenMessages([])
+    setCitizenDraft('')
+    setCitizenError('')
+    setCitizenTyping(false)
+    citizenBusy.current = false
+  }, [clearAgentChat])
 
   // Add toast notification
   const addToast = (message, type = 'success') => {
@@ -115,6 +179,7 @@ export function AppProvider({ children }) {
 
   const clearAccount = useCallback(() => {
     clearSchemeChat()
+    clearSchemeProfile()
     accountVersion.current += 1
     identityVersion.current += 1
     sessionUser.current = null
@@ -136,7 +201,7 @@ export function AppProvider({ children }) {
     setToasts([])
     setAuthLoading(false)
     setComplaintsLoading(false)
-  }, [clearSchemeChat])
+  }, [clearSchemeChat, clearSchemeProfile])
 
   useEffect(() => onUnauthorized(failedToken => {
     if (failedToken !== sessionToken.current) return
@@ -166,6 +231,7 @@ export function AppProvider({ children }) {
         }
         identityVersion.current += 1
         clearSchemeChat()
+        clearSchemeProfile()
         sessionUser.current = nextSession?.user.id || null
         setCurrentUser(GUEST)
         setComplaints([])
@@ -187,7 +253,7 @@ export function AppProvider({ children }) {
       if (!nextSession) setComplaintsLoading(false)
     })
     return () => subscription.unsubscribe()
-  }, [clearSchemeChat])
+  }, [clearSchemeChat, clearSchemeProfile])
 
   const applyComplaint = saved => {
     const ticket = complaintView(saved)
@@ -316,33 +382,33 @@ export function AppProvider({ children }) {
     } finally { evidenceBusy.current = false }
   }
 
-  const sendAgentMessage = async () => {
-    const message = agentDraft.trim()
-    if (message.length < 3 || agentBusy.current) return false
+  const sendCitizenMessage = async () => {
+    const message = citizenDraft.trim()
+    if (message.length < 3 || citizenBusy.current) return false
     const version = schemeChatVersion.current
-    const history = agentMessages.slice(-10).map(m => ({ role: m.sender, content: m.text.slice(0, 5000) }))
-    agentBusy.current = true
-    setAgentTyping(true)
-    setAgentError('')
+    const history = citizenMessages.slice(-10).map(m => ({ role: m.sender, content: m.text.slice(0, 5000) }))
+    citizenBusy.current = true
+    setCitizenTyping(true)
+    setCitizenError('')
     const id = crypto.randomUUID()
-    setAgentMessages(previous => [...previous, { id, sender: 'user', text: message }])
+    setCitizenMessages(previous => [...previous, { id, sender: 'user', text: message }])
     try {
-      const reply = await publicApiRequest('/agent/message', { method: 'POST', body: { message, history, profile: { state: selectedState === 'All' ? null : selectedState } } })
+      const reply = await publicApiRequest('/agent/conversation', { method: 'POST', body: { message, history, profile: { state: selectedState === 'All' ? null : selectedState } } })
       if (version !== schemeChatVersion.current) return false
       if (typeof reply.answer !== 'string' || !Array.isArray(reply.citations) || !Array.isArray(reply.tool_trace) ||
         !['scheme', 'complaint', 'mixed', 'unknown'].includes(reply.intent)) throw new Error('The assistant returned an invalid answer. Please retry.')
       if (['grounded_extracts', 'extractive_fallback', 'insufficient_evidence'].includes(reply.mode)) schemeAnswer(reply)
       else if (reply.citations.length || !['clarification', 'ai_suggestion'].includes(reply.mode)) throw new Error('The assistant returned invalid sources. Please retry.')
-      setAgentMessages(previous => [...previous, { id: crypto.randomUUID(), sender: 'assistant', text: reply.answer, citations: reply.citations, mode: reply.mode }])
-      setAgentDraft(current => current.trim() === message ? '' : current)
+      setCitizenMessages(previous => [...previous, { id: crypto.randomUUID(), sender: 'assistant', text: reply.answer, citations: reply.citations, mode: reply.mode }])
+      setCitizenDraft(current => current.trim() === message ? '' : current)
       return true
     } catch (error) {
       if (version === schemeChatVersion.current) {
-        setAgentError(error.message)
-        setAgentMessages(previous => previous.filter(m => m.id !== id))
+        setCitizenError(error.message)
+        setCitizenMessages(previous => previous.filter(m => m.id !== id))
       }
       return false
-    } finally { if (version === schemeChatVersion.current) { agentBusy.current = false; setAgentTyping(false) } }
+    } finally { if (version === schemeChatVersion.current) { citizenBusy.current = false; setCitizenTyping(false) } }
   }
 
   const updateComplaintStatus = async (ticketId, status, note = '') => {
@@ -380,16 +446,23 @@ export function AppProvider({ children }) {
     await refreshComplaints()
   }
 
+  const invalidateSchemeSearch = useCallback((loading = false) => {
+    schemeRequest.current += 1
+    setSchemes([])
+    setSchemesError('')
+    setSchemesLoading(loading)
+  }, [])
+
   const loadSchemes = useCallback(async ({ query = '', state = '', category = '' } = {}) => {
     const request = ++schemeRequest.current
     setSchemesLoading(true)
     setSchemesError('')
     try {
-      const params = new URLSearchParams({ limit: '10' })
+      const params = new URLSearchParams({ limit: '50' })
       if (query.trim()) { params.set('query', query.trim()); params.set('search_mode', 'keyword') }
       if (state && state !== 'All') params.set('state', state)
       if (category && category !== 'All') params.set('category', category)
-      const records = await publicApiRequest(`/schemes?${params}`)
+      const records = await schemeApiRequest(`/schemes?${params}`)
       if (!Array.isArray(records)) throw new Error('The scheme service returned an invalid list. Please retry.')
       if (request === schemeRequest.current) setSchemes(records.map(schemeView))
     } catch (error) {
@@ -397,7 +470,7 @@ export function AppProvider({ children }) {
     } finally {
       if (request === schemeRequest.current) setSchemesLoading(false)
     }
-  }, [])
+  }, [schemeApiRequest])
 
   const sendChatMessage = async (userText, category = '') => {
     if (!userText.trim() || schemeChatBusy.current) return false
@@ -409,8 +482,8 @@ export function AppProvider({ children }) {
     setChatMessages(prev => [...prev, { id: `u-${now}`, sender: 'user', text: userText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     try {
-      const profile = { ...(selectedState !== 'All' ? { state: selectedState } : {}), ...(currentUser.occupation ? { occupation: currentUser.occupation } : {}) }
-      const reply = schemeAnswer(await publicApiRequest('/schemes/ask', {
+      const profile = { ...(schemeProfile.state || selectedState !== 'All' ? { state: schemeProfile.state || selectedState } : {}), ...(schemeProfile.occupation ? { occupation: schemeProfile.occupation } : {}) }
+      const reply = schemeAnswer(await schemeApiRequest('/schemes/ask', {
         method: 'POST', body: JSON.stringify({ message: userText, profile,
           history: chatMessages.filter(m => m.sender === 'user').slice(-5).map(m => m.text.slice(0, 1000)),
           ...(category && category !== 'All' ? { category } : {}) }),
@@ -428,6 +501,29 @@ export function AppProvider({ children }) {
       return false
     } finally {
       if (version === schemeChatVersion.current) { schemeChatBusy.current = false; setIsAiTyping(false) }
+    }
+  }
+
+  const sendAgentMessage = async message => {
+    if (agentBusy.current || message.trim().length < 3) return false
+    agentBusy.current = true
+    const version = agentVersion.current, id = ++agentMessageId.current
+    setAgentTyping(true)
+    setAgentError('')
+    setAgentMessages(prev => [...prev, { id: `agent-u-${id}`, sender: 'user', text: message }])
+    try {
+      const reply = agentReply(await schemeApiRequest('/agent/message', { method: 'POST', timeoutMs: 160000,
+        body: { message, ...(agentSession.current ? { session_id: agentSession.current } : {}),
+          ...(Object.keys(schemeProfileRef.current).length ? { profile: schemeProfileRef.current } : {}) } }))
+      if (version !== agentVersion.current) return false
+      agentSession.current = reply.session_id
+      setAgentMessages(prev => [...prev, { id: `agent-a-${id}`, sender: 'assistant', text: reply.response, ...reply }])
+      return true
+    } catch (error) {
+      if (version === agentVersion.current) setAgentError(error.message)
+      return false
+    } finally {
+      if (version === agentVersion.current) { agentBusy.current = false; setAgentTyping(false) }
     }
   }
 
@@ -480,9 +576,12 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         currentUser,
+        invalidateSchemeSearch, schemeProfile, updateSchemeProfile, eligibility, checkEligibility,
+        profileEditing, setProfileEditing, activeCitation, setActiveCitation,
+        agentMessages, agentError, agentTyping, sendAgentMessage, agentComplaintDraft, setAgentComplaintDraft,
         session, authLoading, authBusy, authError, loginRole, setLoginRole, signIn, signOut, signUp,
         complaintDraft, setComplaintDraft, pendingEvidence, uploadEvidence, evidenceMaxBytes,
-        agentMessages, agentDraft, setAgentDraft, agentError, agentTyping, sendAgentMessage,
+        citizenMessages, citizenDraft, setCitizenDraft, citizenError, citizenTyping, sendCitizenMessage,
         schemeChatDraft, setSchemeChatDraft,
         complaintsLoading, complaintsError, complaintsTruncated, refreshComplaints, loadComplaint, updateComplaintRouting,
         complaintSaving, complaintSaveError, saveOfficialReference,

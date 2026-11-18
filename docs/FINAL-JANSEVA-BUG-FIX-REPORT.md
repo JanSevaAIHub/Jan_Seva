@@ -1,5 +1,6 @@
 # JanSeva AI final bug-fix and release report
 
+This document records the initial repair before main-branch integration. See [main integration and push verification](MAIN-PUSH-VERIFICATION.md) for the latest combined code, tests and publication scope.
 Date: **2026-11-19 (Asia/Calcutta)**. Branch: `feature/combined-work`; baseline `c4fa4dc`.
 
 ## A. Executive summary

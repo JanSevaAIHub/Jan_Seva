@@ -2,13 +2,13 @@
 
 An independent citizen-assistance portfolio project: discover public schemes with cited evidence, create internal civic complaints, and review their history with an assigned officer. JanSeva does not file government grievances or verify government resolution.
 
-**Release status (2026-11-19): PARTIALLY VERIFIED.** Local code, browser journeys and build are tested; live database, authenticated Supabase sessions, OpenAI and private Storage persistence remain blocked by missing credentials. Read [the final release report](docs/FINAL-JANSEVA-BUG-FIX-REPORT.md) and [bug audit](docs/final-bug-audit.md). Earlier release reports describe historical states.
+**Release status (2026-11-19): PARTIALLY VERIFIED.** Local code, browser journeys and build are tested; live database, authenticated Supabase sessions, OpenAI and private Storage persistence remain blocked by missing credentials. Read [the latest main integration verification](docs/MAIN-PUSH-VERIFICATION.md), [the initial repair report](docs/FINAL-JANSEVA-BUG-FIX-REPORT.md) and [bug audit](docs/final-bug-audit.md). Earlier release reports describe historical states.
 
 ## Technology and architecture
 
 - Frontend: React 19, JavaScript, Vite 8, React Router, existing CSS/Tailwind utilities, Lucide icons and Supabase JavaScript client.
 - Backend: Python, FastAPI, Pydantic, SQLAlchemy 2, psycopg, PyJWT and httpx.
-- Services: PostgreSQL with pgvector, Supabase Auth with asymmetric signing keys, and OpenAI embeddings/Responses through server-side HTTP calls. No LangChain or separate vector database.
+- Services: PostgreSQL with pgvector, Supabase Auth with asymmetric signing keys, and OpenAI embeddings/Responses through server-side HTTP calls. LangGraph supplies finite read-only agent routing; no separate vector database.
 - Tests: pytest, Node test runner and Playwright/Chromium. SQLite and a local Auth provider double are used only in isolated tests.
 
 ```mermaid
@@ -95,7 +95,7 @@ A verified first-time user now receives a server-owned citizen profile automatic
 
 Only the configured demo citizen's **new** complaints are assigned to the configured officer. Both profiles must exist and the assignee must be an officer. Absent assignment leaves tickets unassigned; partial/invalid configuration fails closed. This grants no other user's access and does not reassign historical tickets.
 
-The checked-in corpus contains **8 schemes, 8 reviewed source notes and 8 current chunks**: PM-KISAN, NMMSS, PMSBY, PMJJBY, APY, Sukanya Samriddhi, PM Vishwakarma and Punjab Ashirwad. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
+The checked-in corpus contains **12 schemes and 12 reviewed source notes**: PM-KISAN, NMMSS, PMSBY, PMJJBY, APY, Sukanya Samriddhi, PM Vishwakarma Punjab Ashirwad, IGNOAPS, IGNWPS, IGNDPS and PM-SYM. These are file counts, not live database counts. See [source provenance and currency limits](data/README.md).
 
 ## Running
 
@@ -178,4 +178,9 @@ This historical live gate writes/ingests the corpus and uses billable model call
 
 Select an optional JPEG, PNG or WebP (default 5 MB), review the complaint, then explicitly confirm the internal ticket. The backend verifies JWT and ownership, bounds streamed bytes, checks actual image format/pixels, strips image metadata, and generates the object path. The bucket must be private. Metadata is persisted separately from the complaint; evidence failure retains the ticket and selected file with a photo-only retry. Tracking and officer details request fresh private access links. All government filing remains the citizen's explicit external action.
 
-Pillow is the only added runtime dependency, for actual image decoding and validation. Uploads use binary bodies through existing httpx rather than introducing a second Supabase SDK. The agent uses the project's existing OpenAI Responses REST integration; no LangGraph implementation existed to preserve.
+Pillow is the only added runtime dependency, for actual image decoding and validation. Uploads use binary bodies through existing httpx rather than introducing a second Supabase SDK. The focused citizen assistant uses the existing OpenAI Responses REST integration. The homepage navigator preserves Developer A's finite LangGraph workflow, source validation, stored-rule eligibility and explicit draft-transfer actions.
+
+
+## Integrated Developer A scheme navigator
+
+The merged main branch adds the versioned 12-scheme corpus, evidence-backed rule evaluation, profile editor, citation drawer, validated LangGraph tool routing and labelled lexical fallback over real stored chunks. See [RAG implementation](docs/developer-a-phase-1-rag.md) and [scheme UI implementation](docs/developer-a-phase-2-ui.md). The homepage uses `/api/agent/message`; the complaint-page citizen composer uses `/api/agent/conversation` with bounded user history. The complete stored-rule assessment uses `/api/schemes/eligibility`; the limited eight-record quick screening remains `/api/schemes/screen`. Both approaches require official review and never guarantee eligibility.

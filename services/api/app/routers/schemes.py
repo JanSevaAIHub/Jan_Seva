@@ -1,6 +1,6 @@
 """Public, read-only scheme discovery from the real database and pgvector."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,8 @@ from app.ai.scheme_schemas import SchemeAnswer, SchemeAsk, SchemeCard
 from app.config import ConfigurationError
 from app.db import get_db
 from app.models import Scheme
-from app.ai.eligibility import EligibilityProfile, screen
+from app.ai.screening import EligibilityProfile, screen
+from app.ai.eligibility import EligibilityRequest, EligibilityResult, evaluate_eligibility
 from app.schemas import APIModel
 from uuid import UUID
 from typing import Literal
@@ -22,13 +23,22 @@ router = APIRouter(prefix="/schemes", tags=["schemes"])
 model_budget = ModelBudget()
 
 
-class EligibilityRequest(APIModel):
+@router.post("/eligibility", response_model=EligibilityResult)
+def check_eligibility(request: EligibilityRequest, db: Session = Depends(get_db)):
+    scheme = db.get(Scheme, request.scheme_id)
+    if scheme is None:
+        raise HTTPException(404, detail={"code": "SCHEME_NOT_FOUND", "message": "Scheme was not found."})
+    return evaluate_eligibility(scheme, request.profile)
+
+
+
+class ScreeningRequest(APIModel):
     scheme_id: UUID
     profile: EligibilityProfile
 
 
-@router.post("/eligibility")
-def scheme_eligibility(data: EligibilityRequest, db: Session = Depends(get_db)):
+@router.post("/screen")
+def scheme_eligibility(data: ScreeningRequest, db: Session = Depends(get_db)):
     scheme = db.get(Scheme, data.scheme_id)
     if scheme is None or not official_url(scheme.source_url):
         raise HTTPException(404, detail={"code": "SCHEME_NOT_FOUND", "message": "Reviewed scheme not found."})
@@ -64,7 +74,7 @@ def unavailable(error):
 
 
 @router.get("", response_model=list[SchemeCard], dependencies=[Depends(model_request_budget)])
-def list_schemes(query: str | None = Query(default=None, min_length=3, max_length=1000),
+def list_schemes(response: Response, query: str | None = Query(default=None, min_length=3, max_length=1000),
                   state: str | None = Query(default=None, min_length=2, max_length=100),
                   category: str | None = Query(default=None, min_length=2, max_length=100),
                   search_mode: Literal["semantic", "keyword"] = "semantic",
@@ -75,12 +85,14 @@ def list_schemes(query: str | None = Query(default=None, min_length=3, max_lengt
         if len(query.strip()) < 3:
             raise HTTPException(422, detail={"code": "INVALID_QUERY", "message": "Enter at least three non-whitespace characters."})
         try:
-            passages = retrieve(db, query, state, category, limit=min(limit, 10))
+            passages = retrieve(db, query, state, category, limit=min(limit, 5))
         except (ConfigurationError, ProviderError) as error:
             raise unavailable(error) from None
+        response.headers["X-Scheme-Retrieval"] = getattr(passages, "method", "pgvector_cosine_retrieval")
         ids = list(dict.fromkeys(p.scheme_id for p in passages))
         schemes = {s.id: s for s in db.scalars(select(Scheme).where(Scheme.id.in_(ids)))}
         return [card(schemes[id]) for id in ids if id in schemes]
+    response.headers["X-Scheme-Retrieval"] = "keyword_search" if query is not None else "stored_records"
     result = select(Scheme).order_by(Scheme.title).limit(limit)
     if query is not None:
         result = result.where(Scheme.title.icontains(query.strip(), autoescape=True) | Scheme.description.icontains(query.strip(), autoescape=True))

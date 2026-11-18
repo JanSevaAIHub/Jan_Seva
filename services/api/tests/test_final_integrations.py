@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.ai.budget import ModelBudget
 from app.ai.corpus import read_corpus
-from app.ai.eligibility import IDS
+from app.ai.screening import IDS
 from app.config import ConfigurationError, get_settings
 from app.db import get_engine
 from app.models import Complaint, Scheme
@@ -34,15 +34,15 @@ def test_keyword_search_filters_and_eligibility_are_real_database_features_witho
     result = client.get('/api/schemes', params={'query':'Suraksha','search_mode':'keyword','category':'Insurance','state':'Punjab'})
     assert result.status_code == 200 and [s['id'] for s in result.json()] == [IDS['pmsby']]
     assert client.get('/api/schemes', params={'query':'%', 'search_mode':'keyword'}).status_code == 422
-    assert len(client.get('/api/schemes').json()) == 8
-    result = client.post('/api/schemes/eligibility', json={'scheme_id':IDS['pmsby'], 'profile':{'age':71}})
+    assert len(client.get('/api/schemes?limit=50').json()) == 12
+    result = client.post('/api/schemes/screen', json={'scheme_id':IDS['pmsby'], 'profile':{'age':71}})
     assert result.status_code == 200 and result.json()['status'] == 'NOT_MATCHED'
     assert result.json()['source_url'].startswith('https://')
 
 
 @pytest.mark.parametrize('profile', [{'age':True}, {'age':-1}, {'bank_account':'yes'}, {'annual_income':-5}, {'role':'officer'}])
 def test_eligibility_invalid_profile_is_rejected(client, profile):
-    assert client.post('/api/schemes/eligibility', json={'scheme_id':IDS['pmsby'],'profile':profile}).status_code == 422
+    assert client.post('/api/schemes/screen', json={'scheme_id':IDS['pmsby'],'profile':profile}).status_code == 422
 
 
 @pytest.mark.parametrize('who,status', [('anonymous',401),('officer',403),('other_officer',403)])
@@ -109,3 +109,27 @@ def test_assigned_officer_routing_persists_an_event_visible_to_owner(client, pro
     assert len(owner_view['events'])==2 and 'No government referral' in owner_view['events'][-1]['note']
     repeated=client.patch(f"/api/officer/complaints/{ticket['id']}/routing",json={'category':'water'},headers=officer).json()
     assert len(repeated['events'])==2
+
+
+def test_navigator_uses_integrated_complaint_ai_without_writing(monkeypatch, db_session):
+    from app.ai import agent_tools
+    from app.ai.agent_schemas import AgentMessage
+    monkeypatch.setattr(agent_tools, 'analyze_civic_problem', lambda *_: {
+        'category':'road', 'draft':'Synthetic AI-assisted facts for review.', 'notice':'Editable AI suggestion only. Nothing submitted.'})
+    request=AgentMessage(message='Help prepare a road complaint')
+    capability=agent_tools.analyze_complaint(db_session,request)
+    assert capability['available'] is True
+    draft=agent_tools.draft_complaint(request,capability['advice'])
+    assert draft.category=='road' and draft.description=='Synthetic AI-assisted facts for review.'
+    assert list(db_session.scalars(select(Complaint)))==[]
+
+
+def test_navigator_reports_missing_complaint_provider_truthfully(monkeypatch, db_session):
+    from app.ai import agent_tools
+    from app.ai.agent_schemas import AgentMessage
+    monkeypatch.setattr(agent_tools, 'analyze_civic_problem', lambda *_: (_ for _ in ()).throw(ConfigurationError('OPENAI_API_KEY is absent')))
+    request=AgentMessage(message='Help prepare a road complaint')
+    capability=agent_tools.analyze_complaint(db_session,request)
+    assert capability['available'] is False and 'unavailable' in capability['detail']
+    assert 'not implemented' not in capability['detail']
+    assert agent_tools.draft_complaint(request).description==request.message

@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(os.environ.get("JANSEVA_LIVE_RAG") != "1", reaso
 
 def test_real_ingestion_rerun_vectors_and_five_questions():
     records, errors = read_corpus()
-    assert not errors and len(records) >= 8
+    assert not errors and len(records) >= 12
     engine = get_engine()
     for record in records:
         with Session(engine) as db, db.begin():
@@ -31,7 +31,7 @@ def test_real_ingestion_rerun_vectors_and_five_questions():
     with Session(engine) as db:
         prepare_vectors(db)
         before = db.scalar(text("SELECT count(*) FROM scheme_chunks WHERE source_metadata->>'corpus'=:corpus"), {"corpus": CORPUS})
-        assert db.scalar(text("SELECT count(*) FROM scheme_chunks WHERE is_current AND embedding_vector IS NOT NULL AND source_metadata->>'corpus'=:corpus"), {"corpus": CORPUS}) >= 8
+        assert db.scalar(text("SELECT count(*) FROM scheme_chunks WHERE is_current AND embedding_vector IS NOT NULL AND source_metadata->>'corpus'=:corpus"), {"corpus": CORPUS}) >= len(records)
     for record in records:
         with Session(engine) as db, db.begin():
             _, embedded = ingest_record(db, record)

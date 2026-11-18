@@ -25,7 +25,7 @@ export function EligibilityChecker() {
     const current = ++version.current
     setBusy(true); setError('')
     try {
-      const reply = await publicApiRequest('/schemes/eligibility', { method: 'POST', body: { scheme_id: selected || schemes[0].id, profile } })
+      const reply = await publicApiRequest('/schemes/screen', { method: 'POST', body: { scheme_id: selected || schemes[0].id, profile } })
       if (!['POTENTIAL', 'NOT_MATCHED', 'NEEDS_INFO'].includes(reply.status) || !Array.isArray(reply.reasons) || !Array.isArray(reply.missing_fields)) throw new Error('Eligibility screening returned an invalid response. Please retry.')
       if (current === version.current) setResult(reply)
     } catch (e) { if (current === version.current) setError(e.message) }

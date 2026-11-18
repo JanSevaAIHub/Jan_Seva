@@ -1,0 +1,149 @@
+{
+  "environment": "Actual local HTTP responses from the isolated SQLite E2E server. Reviewed stored schemes and the deterministic production eligibility route are real; hosted Supabase/PostgreSQL is not exercised.",
+  "examples": [
+    {
+      "request": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "profile": {
+          "age": 22,
+          "participating_account": true,
+          "auto_debit_consent": true
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "status": "POTENTIAL",
+        "matched_rules": [
+          "Age must be at least 18",
+          "Age must be at most 70",
+          "Participating bank or post-office account: Yes",
+          "Auto-debit consent: Yes"
+        ],
+        "missing_fields": [],
+        "reasons": [
+          "Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."
+        ],
+        "citations": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "profile": {
+          "age": 17,
+          "participating_account": true,
+          "auto_debit_consent": true
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "status": "NOT_MATCHED",
+        "matched_rules": [
+          "Age must be at most 70",
+          "Participating bank or post-office account: Yes",
+          "Auto-debit consent: Yes"
+        ],
+        "missing_fields": [],
+        "reasons": [
+          "Supplied information does not satisfy Age must be at least 18.",
+          "Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."
+        ],
+        "citations": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "profile": {
+          "age_range": {
+            "min": 16,
+            "max": 20
+          },
+          "participating_account": true,
+          "auto_debit_consent": true
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "status": "NEEDS_INFO",
+        "matched_rules": [
+          "Age must be at most 70",
+          "Participating bank or post-office account: Yes",
+          "Auto-debit consent: Yes"
+        ],
+        "missing_fields": [
+          "age"
+        ],
+        "reasons": [
+          "Provide a more precise value; the supplied range crosses this condition: Age must be at least 18.",
+          "Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."
+        ],
+        "citations": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "profile": {}
+      },
+      "http_status": 200,
+      "response": {
+        "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+        "status": "NEEDS_INFO",
+        "matched_rules": [],
+        "missing_fields": [
+          "age",
+          "participating_account",
+          "auto_debit_consent"
+        ],
+        "reasons": [
+          "Provide age to check: Age must be at least 18.",
+          "Provide age to check: Age must be at most 70.",
+          "Provide participating_account to check: Participating bank or post-office account: Yes.",
+          "Provide auto_debit_consent to check: Auto-debit consent: Yes.",
+          "Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."
+        ],
+        "citations": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ]
+      }
+    }
+  ]
+}

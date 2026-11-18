@@ -1,0 +1,18 @@
+Scheme: Pradhan Mantri Shram Yogi Maandhan (PM-SYM)
+State: National
+Department: Ministry of Labour and Employment
+Scope: Central
+Source URL: https://www.pib.gov.in/PressReleasePage.aspx?PRID=2108082&lang=2&reg=3
+Reviewed: 2026-11-09 (Asia/Calcutta)
+Evidence type: reviewed paraphrase, not a verbatim quotation.
+
+Voluntary contributory pension for workers in the unorganised sector.
+
+Eligibility: Entry is for unorganised workers aged 18 to 40 with monthly income at most Rs. 15000. Applicants must not have EPF, ESIC or NPS coverage, pay income tax, or receive another government pension.
+
+The source is a March 2025 ministry backgrounder. Contributions and enrolment must be confirmed by the provider; no active coverage is established.
+
+Verified records: Aadhaar Card; Savings bank or Jan Dhan account details with IFSC; Mobile number
+Official application portal linked by the ministry: https://maandhan.in/
+
+This is a partial reviewed source note. Official assessment and current terms still apply.

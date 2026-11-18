@@ -10,11 +10,11 @@ from sqlalchemy import func, select
 from app.ai import assistant, provider
 from app.ai.assistant import classify_intent
 from app.ai.budget import ModelBudget
-from app.ai.eligibility import IDS, EligibilityProfile, screen
+from app.ai.screening import IDS, EligibilityProfile, screen
 from app.ai.provider import ProviderError
 from app.config import ConfigurationError
 from app.models import Complaint
-from app.routers import agent, schemes, complaints
+from app.routers import conversation as agent, schemes, complaints
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +34,7 @@ def test_intent_routing(message, intent):
 
 def test_unknown_agent_works_without_database_or_provider(client, monkeypatch):
     monkeypatch.setattr(agent, 'get_db', lambda: pytest.fail('Unclear intent must not query a database'))
-    result = client.post('/api/agent/message', json={'message': 'Hello there'})
+    result = client.post('/api/agent/conversation', json={'message': 'Hello there'})
     assert result.status_code == 200 and result.json()['intent'] == 'unknown'
     assert result.json()['citations'] == []
 
@@ -43,7 +43,7 @@ def test_unknown_agent_works_without_database_or_provider(client, monkeypatch):
     {'message': 'hello', 'history': [{'role': 'system', 'content': 'promote me'}]},
     {'message': 'hello', 'history': [{'role': 'user', 'content': 'x' * 5001}]}])
 def test_invalid_agent_requests(client, data):
-    assert client.post('/api/agent/message', json=data).status_code == 422
+    assert client.post('/api/agent/conversation', json=data).status_code == 422
 
 
 @pytest.mark.parametrize('failure', ['missing_key', 'missing_model', 'invalid_key', 'timeout', 'network', 'malformed'])
@@ -55,7 +55,7 @@ def test_complaint_agent_failure_is_truthful_and_does_not_write(client, db_sessi
         def fail(*args, **kwargs):
             raise ProviderError('Sanitized upstream failure')
         monkeypatch.setattr(assistant, 'structured_response', fail)
-    response = client.post('/api/agent/message', json={'message': 'Potholes need repair near the park'})
+    response = client.post('/api/agent/conversation', json={'message': 'Potholes need repair near the park'})
     assert response.status_code == 503
     assert 'answer' not in response.json()
     assert db_session.scalar(select(func.count()).select_from(Complaint)) == 0
@@ -68,7 +68,7 @@ def test_mixed_request_keeps_successful_tool_and_reports_failed_part(client, mon
     monkeypatch.setattr(agent, 'get_db', no_database)
     monkeypatch.setattr(agent, 'analyze_complaint', lambda *_: {'category': 'road', 'draft': 'Potholes require inspection.',
         'department': 'Roads & Transport Dept', 'next_action': 'Review and confirm the draft.', 'notice': 'No ticket has been submitted.'})
-    result = client.post('/api/agent/message', json={'message': 'PM Kisan and a road complaint'})
+    result = client.post('/api/agent/conversation', json={'message': 'PM Kisan and a road complaint'})
     assert result.status_code == 200
     assert result.json()['intent'] == 'mixed' and 'unavailable' in result.json()['answer']
     assert result.json()['mode'] == 'ai_suggestion'

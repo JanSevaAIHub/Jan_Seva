@@ -1,0 +1,281 @@
+{
+  "environment": "Actual HTTP responses from the isolated SQLite browser-test server. Provider access is disabled and the PostgreSQL catalog guard is explicitly doubled. Complaint analysis is unavailable and reported as such. These are not hosted/provider checks.",
+  "examples": [
+    {
+      "request": {
+        "message": "What are the PMSBY scheme eligibility conditions?"
+      },
+      "status": 200,
+      "response": {
+        "session_id": "e6354124-81e0-4d8c-b4fc-e57bbf6dc5fa",
+        "intent": "scheme",
+        "response": "Lexical retrieval fallback \u2014 embedding service unavailable; matches use stored text terms.\n\nExtractive fallback \u2014 the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n[1] Pradhan Mantri Suraksha Bima Yojana (PMSBY)\nScheme: Pradhan Mantri Suraksha Bima Yojana (PMSBY)\nState: National\nCategory: Insurance\nSource URL: https://financialservices.gov.in/pmsby\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nRenewable annual personal accident insurance covering specified accidental death or disability.\n\nEligibility: Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.\n\nVerified documents / enrolment records: Prescribed enrolment / consent-cum-declaration form; Auto-debit authorization\n\nEvidence and limitations: The Department of Financial Services FAQ lists Rs. 2 lakh for accidental death or specified total permanent disability and Rs. 1 lakh for specified partial permanent disability. It lists an annual premium of Rs. 20, subject to revision. Banks retain enrolment and consent records. The reviewed document list is partial; no blanket Aadhaar requirement is inferred.\n\nEligibility assessment (NEEDS_INFO): Provide age to check: Age must be at least 18. Provide age to check: Age must be at most 70. Provide participating_account to check: Participating bank or post-office account: Yes. Provide auto_debit_consent to check: Auto-debit consent: Yes. Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority. Missing: age, participating_account, auto_debit_consent.",
+        "status": "partial",
+        "citations": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "chunk_id": "2f9cdf60-b3e8-5721-b3a9-0da3e8532ee9",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "excerpt": "Scheme: Pradhan Mantri Suraksha Bima Yojana (PMSBY)\nState: National\nCategory: Insurance\nSource URL: https://financialservices.gov.in/pmsby\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nRenewable annual personal accident insurance covering specified accidental death or disability.\n\nEligibility: Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.\n\nVerified documents / enrolment records: Prescribed enrolment / consent-cum-declaration form; Auto-debit authorization\n\nEvidence and limitations: The Department of Financial Services FAQ lists Rs. 2 lakh for accidental death or specified total permanent disability and Rs. 1 lakh for specified partial permanent disability. It lists an annual premium of Rs. 20, subject to revision. Banks retain enrolment and consent records. The reviewed document list is partial; no blanket Aadhaar requirement is inferred.",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "evidence_kind": "reviewed_paraphrase"
+          },
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+            "url": "https://financialservices.gov.in/pmsby",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ],
+        "actions": [
+          {
+            "tool": "open_schemes",
+            "status": "ok",
+            "detail": "Browse sources and edit your local eligibility profile.",
+            "label": "Open Scheme Discovery",
+            "path": "/schemes",
+            "requires_confirmation": false,
+            "draft": null
+          }
+        ],
+        "tool_trace": [
+          {
+            "tool": "classify_intent",
+            "status": "error",
+            "detail": "Intent provider unavailable; conservative deterministic routing used."
+          },
+          {
+            "tool": "search_schemes",
+            "status": "ok",
+            "detail": "Existing scheme service returned 1 citations for verification."
+          },
+          {
+            "tool": "lexical_fallback",
+            "status": "ok",
+            "detail": "Retrieved 1 source-linked passages after filtering. Embedding provider unavailable; deterministic lexical ranking of stored evidence was used, not vector similarity."
+          },
+          {
+            "tool": "grounded_generation",
+            "status": "error",
+            "detail": "LLM unavailable; returning explicitly labelled, unmodified related extracts."
+          },
+          {
+            "tool": "evidence_check",
+            "status": "ok",
+            "detail": "Verified actual active stored chunks, scheme identity, exact excerpts, response text, official URLs and review metadata."
+          },
+          {
+            "tool": "check_eligibility",
+            "status": "ok",
+            "detail": "Deterministic stored-rule assessment; unknown fields remain unknown."
+          }
+        ],
+        "eligibility": [
+          {
+            "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+            "status": "NEEDS_INFO",
+            "matched_rules": [],
+            "missing_fields": [
+              "age",
+              "participating_account",
+              "auto_debit_consent"
+            ],
+            "reasons": [
+              "Provide age to check: Age must be at least 18.",
+              "Provide age to check: Age must be at most 70.",
+              "Provide participating_account to check: Participating bank or post-office account: Yes.",
+              "Provide auto_debit_consent to check: Auto-debit consent: Yes.",
+              "Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."
+            ],
+            "citations": [
+              {
+                "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+                "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+                "url": "https://financialservices.gov.in/pmsby",
+                "reviewed_at": "2026-11-07T00:00:00",
+                "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+                "evidence_kind": "reviewed_paraphrase"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "message": "Help prepare a complaint about a broken streetlight near the park"
+      },
+      "status": 200,
+      "response": {
+        "session_id": "f9f2a952-1b63-4f09-8dae-fc4ea0bf3fb9",
+        "intent": "complaint",
+        "response": "Complaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced. Your supplied text is available as an editable draft; review and complete its fields in the existing complaint form. Nothing has been saved, registered, sent or filed with a government system. An authenticated review and explicit confirmation are required to create an internal JanSeva ticket.",
+        "status": "partial",
+        "citations": [],
+        "actions": [
+          {
+            "tool": "draft_complaint",
+            "status": "ok",
+            "detail": "Confirmation required in the existing authenticated review flow. No action has been executed.",
+            "label": "Review complaint draft",
+            "path": "/complaints/new",
+            "requires_confirmation": true,
+            "draft": {
+              "title": "",
+              "description": "Help prepare a complaint about a broken streetlight near the park",
+              "category": null,
+              "locality": ""
+            }
+          }
+        ],
+        "tool_trace": [
+          {
+            "tool": "classify_intent",
+            "status": "error",
+            "detail": "Intent provider unavailable; conservative deterministic routing used."
+          },
+          {
+            "tool": "analyze_complaint",
+            "status": "error",
+            "detail": "Complaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced."
+          },
+          {
+            "tool": "draft_complaint",
+            "status": "ok",
+            "detail": "Copied supplied text into an editable proposal only. No category prediction, ticket creation or government filing."
+          }
+        ],
+        "eligibility": []
+      }
+    },
+    {
+      "request": {
+        "message": "Show pension schemes and help prepare a water complaint"
+      },
+      "status": 200,
+      "response": {
+        "session_id": "41704f53-4b61-45ff-880b-3f1ae1c0aa4b",
+        "intent": "mixed",
+        "response": "Lexical retrieval fallback \u2014 embedding service unavailable; matches use stored text terms.\n\nExtractive fallback \u2014 the LLM is unavailable. These related stored evidence summaries may not answer your question; they do not establish your eligibility or current application availability.\n\n[1] Atal Pension Yojana (APY)\nScheme: Atal Pension Yojana (APY)\nState: National\nCategory: Social Welfare\nSource URL: https://sansad.in/getFile/loksabhaquestions/annex/182/AU2081_we23z8.pdf?source=pqals\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nContributory retirement pension scheme with pension options linked to contributions.\n\nEligibility: The August 2024 Finance Ministry parliamentary answer describes Indian citizens aged 18 to 40 with a savings bank or post-office account. Income-tax payers are not eligible to join from October 1, 2022. This is a national scheme, not a Punjab-only pension.\n\nVerified documents / enrolment records: Complete document list not verified from this source.\n\nEvidence and limitations: The parliamentary answer describes minimum monthly pension choices of Rs. 1,000, 2,000, 3,000, 4,000 or 5,000, depending on joining age and the chosen pension. Contributions are required. This historical official source does not verify a complete document list or subsequent rule changes; applicants should check current official terms.\n\n[2] Indira Gandhi National Widow Pension Scheme (IGNWPS)\nScheme: Indira Gandhi National Widow Pension Scheme (IGNWPS)\nState: Ladakh\nDepartment: Ministry of Rural Development; Social Welfare and Tribal Welfare Department Ladakh\nScope: Central\nSource URL: https://helphub.ladakh.gov.in/landing/pension\nReviewed: 2026-11-09 (Asia/Calcutta)\nEvidence type: reviewed paraphrase, not a verbatim quotation.\n\nPension support for widows in below-poverty-line households.\n\nEligibility: The Ladakh government lists widows aged at least 40 who belong to a below-poverty-line household.\n\nCoverage is limited to the Ladakh implementation reviewed here; other states and their document requirements need separate review.\n\nThis is a partial reviewed source note. Official assessment and current terms still apply.\n\nVerified Ladakh records: Passport size photograph; Aadhaar Card; BPL ration card; Account number with IFSC code; Widow certificate.\nThese are records listed for the reviewed regional implementation; they are not a nationwide checklist.\n\n[3] Indira Gandhi National Old Age Pension Scheme (IGNOAPS)\nScheme: Indira Gandhi National Old Age Pension Scheme (IGNOAPS)\nState: Ladakh\nDepartment: Ministry of Rural Development; Social Welfare and Tribal Welfare Department Ladakh\nScope: Central\nSource URL: https://helphub.ladakh.gov.in/landing/pension\nReviewed: 2026-11-09 (Asia/Calcutta)\nEvidence type: reviewed paraphrase, not a verbatim quotation.\n\nAssistance for older people in below-poverty-line households.\n\nEligibility: The Ladakh government lists applicants aged at least 60 who belong to a below-poverty-line household.\n\nCoverage is limited to the Ladakh implementation reviewed here; other states and their document requirements need separate review.\n\nThis is a partial reviewed source note. Official assessment and current terms still apply.\n\nVerified Ladakh records: Passport size photograph; Aadhaar Card; BPL ration card; Account number with IFSC code.\nThese are records listed for the reviewed regional implementation; they are not a nationwide checklist.\n\nComplaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced. Your supplied text is available as an editable draft; review and complete its fields in the existing complaint form. Nothing has been saved, registered, sent or filed with a government system. An authenticated review and explicit confirmation are required to create an internal JanSeva ticket.",
+        "status": "partial",
+        "citations": [
+          {
+            "scheme_id": "24a51098-4b30-59a3-aa06-c50c58ecb311",
+            "chunk_id": "136dc8fc-ce19-5b4c-a48e-463e2705e62e",
+            "title": "Atal Pension Yojana (APY)",
+            "url": "https://sansad.in/getFile/loksabhaquestions/annex/182/AU2081_we23z8.pdf?source=pqals",
+            "excerpt": "Scheme: Atal Pension Yojana (APY)\nState: National\nCategory: Social Welfare\nSource URL: https://sansad.in/getFile/loksabhaquestions/annex/182/AU2081_we23z8.pdf?source=pqals\nReviewed: 2026-11-07\nEvidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.\n\nContributory retirement pension scheme with pension options linked to contributions.\n\nEligibility: The August 2024 Finance Ministry parliamentary answer describes Indian citizens aged 18 to 40 with a savings bank or post-office account. Income-tax payers are not eligible to join from October 1, 2022. This is a national scheme, not a Punjab-only pension.\n\nVerified documents / enrolment records: Complete document list not verified from this source.\n\nEvidence and limitations: The parliamentary answer describes minimum monthly pension choices of Rs. 1,000, 2,000, 3,000, 4,000 or 5,000, depending on joining age and the chosen pension. Contributions are required. This historical official source does not verify a complete document list or subsequent rule changes; applicants should check current official terms.",
+            "reviewed_at": "2026-11-07T00:00:00",
+            "evidence_kind": "reviewed_paraphrase"
+          },
+          {
+            "scheme_id": "a6298cb2-b390-5669-882e-8c7cc842b87f",
+            "chunk_id": "895ba7fd-9d18-5056-acfd-394b224ce7a5",
+            "title": "Indira Gandhi National Widow Pension Scheme (IGNWPS)",
+            "url": "https://helphub.ladakh.gov.in/landing/pension",
+            "excerpt": "Scheme: Indira Gandhi National Widow Pension Scheme (IGNWPS)\nState: Ladakh\nDepartment: Ministry of Rural Development; Social Welfare and Tribal Welfare Department Ladakh\nScope: Central\nSource URL: https://helphub.ladakh.gov.in/landing/pension\nReviewed: 2026-11-09 (Asia/Calcutta)\nEvidence type: reviewed paraphrase, not a verbatim quotation.\n\nPension support for widows in below-poverty-line households.\n\nEligibility: The Ladakh government lists widows aged at least 40 who belong to a below-poverty-line household.\n\nCoverage is limited to the Ladakh implementation reviewed here; other states and their document requirements need separate review.\n\nThis is a partial reviewed source note. Official assessment and current terms still apply.\n\nVerified Ladakh records: Passport size photograph; Aadhaar Card; BPL ration card; Account number with IFSC code; Widow certificate.\nThese are records listed for the reviewed regional implementation; they are not a nationwide checklist.",
+            "reviewed_at": "2026-11-09T00:00:00",
+            "evidence_kind": "reviewed_paraphrase"
+          },
+          {
+            "scheme_id": "d93c0400-aed9-5fa5-b352-d8cab3fa6269",
+            "chunk_id": "b84d918d-9a52-58b0-9fbc-f57df8448aa3",
+            "title": "Indira Gandhi National Old Age Pension Scheme (IGNOAPS)",
+            "url": "https://helphub.ladakh.gov.in/landing/pension",
+            "excerpt": "Scheme: Indira Gandhi National Old Age Pension Scheme (IGNOAPS)\nState: Ladakh\nDepartment: Ministry of Rural Development; Social Welfare and Tribal Welfare Department Ladakh\nScope: Central\nSource URL: https://helphub.ladakh.gov.in/landing/pension\nReviewed: 2026-11-09 (Asia/Calcutta)\nEvidence type: reviewed paraphrase, not a verbatim quotation.\n\nAssistance for older people in below-poverty-line households.\n\nEligibility: The Ladakh government lists applicants aged at least 60 who belong to a below-poverty-line household.\n\nCoverage is limited to the Ladakh implementation reviewed here; other states and their document requirements need separate review.\n\nThis is a partial reviewed source note. Official assessment and current terms still apply.\n\nVerified Ladakh records: Passport size photograph; Aadhaar Card; BPL ration card; Account number with IFSC code.\nThese are records listed for the reviewed regional implementation; they are not a nationwide checklist.",
+            "reviewed_at": "2026-11-09T00:00:00",
+            "evidence_kind": "reviewed_paraphrase"
+          }
+        ],
+        "actions": [
+          {
+            "tool": "open_schemes",
+            "status": "ok",
+            "detail": "Browse sources and edit your local eligibility profile.",
+            "label": "Open Scheme Discovery",
+            "path": "/schemes",
+            "requires_confirmation": false,
+            "draft": null
+          },
+          {
+            "tool": "draft_complaint",
+            "status": "ok",
+            "detail": "Confirmation required in the existing authenticated review flow. No action has been executed.",
+            "label": "Review complaint draft",
+            "path": "/complaints/new",
+            "requires_confirmation": true,
+            "draft": {
+              "title": "",
+              "description": "Show pension schemes and help prepare a water complaint",
+              "category": null,
+              "locality": ""
+            }
+          }
+        ],
+        "tool_trace": [
+          {
+            "tool": "classify_intent",
+            "status": "error",
+            "detail": "Intent provider unavailable; conservative deterministic routing used."
+          },
+          {
+            "tool": "search_schemes",
+            "status": "ok",
+            "detail": "Existing scheme service returned 3 citations for verification."
+          },
+          {
+            "tool": "lexical_fallback",
+            "status": "ok",
+            "detail": "Retrieved 5 source-linked passages after filtering. Embedding provider unavailable; deterministic lexical ranking of stored evidence was used, not vector similarity."
+          },
+          {
+            "tool": "grounded_generation",
+            "status": "error",
+            "detail": "LLM unavailable; returning explicitly labelled, unmodified related extracts."
+          },
+          {
+            "tool": "analyze_complaint",
+            "status": "error",
+            "detail": "Complaint analysis is not implemented in this backend. No category, department or duplicate prediction was produced."
+          },
+          {
+            "tool": "draft_complaint",
+            "status": "ok",
+            "detail": "Copied supplied text into an editable proposal only. No category prediction, ticket creation or government filing."
+          },
+          {
+            "tool": "evidence_check",
+            "status": "ok",
+            "detail": "Verified actual active stored chunks, scheme identity, exact excerpts, response text, official URLs and review metadata."
+          }
+        ],
+        "eligibility": []
+      }
+    },
+    {
+      "request": {
+        "message": "Can you help me?"
+      },
+      "status": 200,
+      "response": {
+        "session_id": "014b0b3a-139c-472d-bf90-d4631cbd63b7",
+        "intent": "clarify",
+        "response": "Would you like help finding a government scheme, reviewing eligibility conditions, preparing a civic complaint, or viewing your own tickets? Please specify the help you need.",
+        "status": "needs_info",
+        "citations": [],
+        "actions": [],
+        "tool_trace": [
+          {
+            "tool": "classify_intent",
+            "status": "error",
+            "detail": "Intent provider unavailable; conservative deterministic routing used."
+          }
+        ],
+        "eligibility": []
+      }
+    }
+  ]
+}

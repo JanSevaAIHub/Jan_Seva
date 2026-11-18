@@ -19,7 +19,7 @@ from app.models import Scheme
 @pytest.fixture
 def corpus():
     records, failures = read_corpus()
-    assert failures == [] and len(records) == 8
+    assert failures == [] and len(records) >= 12
     return {r.slug: r for r in records}
 
 
@@ -30,7 +30,7 @@ def passage(record):
 
 
 def test_curated_records_all_have_official_sources_and_explicit_document_limits(corpus):
-    assert len({r.id for r in corpus.values()}) == 8
+    assert len({r.id for r in corpus.values()}) == len(corpus)
     assert corpus["punjab-ashirwad"].state == "Punjab"
     assert corpus["ssy"].required_documents
     for record in corpus.values():
@@ -52,10 +52,10 @@ def test_corpus_rejects_traversal_and_duplicate_rows(tmp_path):
     data = (DATA / "schemes.csv").read_text(encoding="utf-8")
     (tmp_path / "schemes.csv").write_text(data.replace("pm-kisan.txt", "../outside.txt"), encoding="utf-8")
     records, errors = read_corpus(tmp_path / "schemes.csv")
-    assert len(records) == 7 and len(errors) == 1
+    assert len(records) == len(data.splitlines()) - 2 and len(errors) == 2
     (tmp_path / "schemes.csv").write_text(data + data.splitlines()[1] + "\n", encoding="utf-8")
     records, errors = read_corpus(tmp_path / "schemes.csv")
-    assert len(records) == 8 and len(errors) == 1
+    assert len(records) == len(data.splitlines()) - 1 and len(errors) == 1
 
 
 def test_embedding_http_payload_dimensions_order_and_errors(monkeypatch):
@@ -90,7 +90,7 @@ def test_list_returns_stored_records_and_filters_without_model_calls(client, db_
     db_session.commit()
     monkeypatch.setattr(provider, "provider_post", lambda *_: pytest.fail("Unqueried listing must not call a model"))
     response = client.get("/api/schemes?state=Haryana&limit=10")
-    assert response.status_code == 200 and len(response.json()) == 7
+    assert response.status_code == 200 and len(response.json()) == sum(r.state == "National" for r in corpus.values())
     assert str(corpus["punjab-ashirwad"].id) not in [row["id"] for row in response.json()]
     students = client.get("/api/schemes?category=Education").json()
     assert len(students) == 1 and students[0]["title"] == corpus["nmmss"].title

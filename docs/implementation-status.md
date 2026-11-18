@@ -1,5 +1,13 @@
 # Implementation status - stabilized combined branch
 
+Latest Phase 3 status (2026-11-09): **PARTIAL**. One LangGraph workflow and the homepage agent integration are implemented and locally tested. Complaint analysis is an explicit unavailable Developer B dependency; no replacement classifier was added. Hosted database/provider gates remain blocked. See [Day 1 handoff](dev-a-day1-handoff.md). Earlier phase counts below are historical.
+
+Current Phase 2 update (2026-11-09): deterministic eligibility, optional age/income ranges, local profile editing and the existing Scheme Discovery UI are integrated. Source drawers, stale-response protection, real stored-text API/UI tests and responsive checks are included. See [the Phase 2 report](developer-a-phase-2-ui.md). Earlier measurements below are historical; hosted verification remains blocked.
+
+Update 2026-11-09: the Scheme RAG foundation has 12 reviewed schemes, cleaned/versioned chunks, schema dimension validation, labelled stored-text fallback and additional ingestion/source-safety regressions. See [the current Phase 1 report](developer-a-phase-1-rag.md) for measured results and blocked live checks. Earlier reports and counts below are historical.
+
+Update 2026-11-09: Developer A Prompt 1 adds four verified source records (12 total) and a deterministic public eligibility endpoint using stored versioned rules. No frontend, agent or live database changes. See [implementation and verification report](developer-a-phase-2-ui.md) for current results, regional limits and Prompt 2 handoff. Measurements below are historical.
+
 Reviewed 2026-11-08. Current baseline: `feature/combined-work`; **CONDITIONALLY READY** for local feature development. The [stabilization report](stabilization-report.md) supersedes the historical Phase 5 measurements below.
 
 - 134 backend tests passed, 1 live test skipped; 11 frontend unit tests and 21 Chromium browser tests passed. Default and Auth-configured production builds pass.

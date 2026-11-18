@@ -28,14 +28,14 @@ async function confirmComplaint(page) {
 test('homepage agent sends to real backend, handles multiple messages, keyboard and route history', async ({ page }) => {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
-  await page.goto('/')
+  await page.goto('/complaints/new')
   const chat = page.getByRole('region', { name: 'Citizen AI Assistant' })
   const input = chat.getByLabel('Message the citizen assistant')
   await expect(chat.getByRole('button', { name: 'Send assistant message' })).toBeDisabled()
   await input.fill('Hello there')
   await input.press('Shift+Enter')
   await expect(input).toHaveValue('Hello there\n')
-  const response = page.waitForResponse(r => r.url().endsWith('/api/agent/message'))
+  const response = page.waitForResponse(r => r.url().endsWith('/api/agent/conversation'))
   await input.press('Enter')
   expect((await response).status()).toBe(200)
   await expect(chat.getByText('Would you like help finding', { exact: false })).toBeVisible()
@@ -43,18 +43,19 @@ test('homepage agent sends to real backend, handles multiple messages, keyboard 
   await input.press('Enter')
   await expect(chat.getByText('Would you like help finding', { exact: false })).toHaveCount(2)
   await input.fill('Keep my editable message')
-  await page.locator('main').getByRole('link', { name: /^Raise Complaint/ }).click()
+  await page.locator('aside').getByRole('link', { name: 'My Requests', exact: true }).click()
+  await page.locator('aside').getByRole('link', { name: 'Raise Complaint', exact: true }).click()
   await expect(page.getByLabel('Message the citizen assistant')).toHaveValue('Keep my editable message')
   await expect(page.getByRole('log')).toContainText('Please clarify')
   expect(errors).toEqual([])
 })
 
 test('missing provider configuration returns usable retry and preserves the actual homepage input', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/complaints/new')
   const chat = page.getByRole('region', { name: 'Citizen AI Assistant' })
   const input = chat.getByLabel('Message the citizen assistant')
   await input.fill('Potholes near the test park')
-  const response = page.waitForResponse(r => r.url().endsWith('/api/agent/message'))
+  const response = page.waitForResponse(r => r.url().endsWith('/api/agent/conversation'))
   await input.press('Enter')
   expect((await response).status()).toBe(503)
   await expect(input).toHaveValue('Potholes near the test park')
@@ -178,14 +179,14 @@ test('citizen signup gives confirmation guidance and never grants officer access
 })
 
 test('AI network failure preserves input and a recovered response renders validated citations (response double)', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/complaints/new')
   const chat = page.getByRole('region', { name: 'Citizen AI Assistant' })
-  await page.route('**/api/agent/message', route => route.abort('failed'))
+  await page.route('**/api/agent/conversation', route => route.abort('failed'))
   await chat.getByLabel('Message the citizen assistant').fill('PM Kisan scheme information')
   await chat.getByRole('button', { name: 'Send assistant message' }).click()
   await expect(chat.getByRole('alert')).toContainText('Cannot reach the API')
-  await page.unroute('**/api/agent/message')
-  await page.route('**/api/agent/message', route => route.fulfill({ json: {
+  await page.unroute('**/api/agent/conversation')
+  await page.route('**/api/agent/conversation', route => route.fulfill({ json: {
     intent: 'scheme', answer: 'Isolated citation rendering fixture.', mode: 'grounded_extracts', tool_trace: [],
     citations: [{ title: 'Official scheme source', url: 'https://www.pib.gov.in/PressReleasePage.aspx?PRID=2191651', excerpt: 'Reviewed test evidence summary.', reviewed_at: '2026-11-07T00:00:00+05:30' }],
   } }))

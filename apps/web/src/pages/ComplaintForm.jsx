@@ -32,7 +32,7 @@ export function ComplaintForm() {
     complaints,
     setReviewModalComplaint,
     setPackageModalComplaint,
-    addToast, complaintDraft, setComplaintDraft
+    addToast, complaintDraft, setComplaintDraft, agentComplaintDraft, setAgentComplaintDraft
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
@@ -51,6 +51,17 @@ export function ComplaintForm() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [aiDetected, setAiDetected] = useState(false)
+
+  // Read-only assistant proposal. Editing/navigating never submits a complaint.
+  useEffect(() => {
+    if (!agentComplaintDraft) return
+    setTitle(agentComplaintDraft.title || '')
+    setDescription(agentComplaintDraft.description)
+    setLocality(agentComplaintDraft.locality || '')
+    setCategory(CATEGORY_LABELS[agentComplaintDraft.category] || 'Other')
+    setAiDetected(false)
+    setAgentComplaintDraft(null)
+  }, [agentComplaintDraft, setAgentComplaintDraft])
 
   // Auto-detect category from title typing
   const handleTitleChange = (val) => {
@@ -268,13 +279,13 @@ export function ComplaintForm() {
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Description *
               </label>
-              <span className="text-[10px] text-slate-400">{description.length}/500</span>
+              <span className="text-[10px] text-slate-400">{description.length}/5000</span>
             </div>
             <textarea
               rows={4}
               minLength={10}
               required
-              maxLength={500}
+              maxLength={5000}
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Describe what happened, exact location landmark, and when it started..."

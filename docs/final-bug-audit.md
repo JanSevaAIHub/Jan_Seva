@@ -1,5 +1,6 @@
 # Final bug audit — 2026-11-19
 
+This document records the initial repair before main-branch integration. See [main integration and push verification](MAIN-PUSH-VERIFICATION.md) for the latest combined code, tests and publication scope.
 Branch: `feature/combined-work`, starting commit `c4fa4dc`. Four pre-existing image deletions are preserved. No commits, pushes, deployments or hosted schema changes are authorized by this audit.
 
 ## Baseline

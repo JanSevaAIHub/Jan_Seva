@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ToastContainer } from '../common/Toast'
 import { SchemeDetailModal } from '../schemes/SchemeDetailModal'
+import { CitationDrawer } from '../schemes/CitationDrawer'
 import { ComplaintReviewModal } from '../complaints/ComplaintReviewModal'
 import { ComplaintPackageModal } from '../complaints/ComplaintPackageModal'
 import { TicketDetailModal } from '../officer/TicketDetailModal'
@@ -22,6 +23,7 @@ export function AppShell() {
       {/* Global Interactive Modals & Toast Feedback */}
       <ToastContainer />
       <SchemeDetailModal />
+      <CitationDrawer />
       <ComplaintReviewModal />
       <ComplaintPackageModal />
       <TicketDetailModal />

@@ -1,6 +1,6 @@
 # Curated scheme evidence
 
-Reviewed on 2026-11-07 (Asia/Calcutta). `schemes.csv` contains eight actual schemes; `scheme_sources/*.txt` contains concise, manually reviewed paraphrases of the linked official sources. These are **not verbatim government quotations**, a complete policy corpus, live deadline verification or personalized eligibility decisions. No mockData.js facts were imported.
+Original eight reviewed on 2026-11-07; four additions reviewed on 2026-11-09 (Asia/Calcutta). `schemes.csv` contains twelve actual schemes; `scheme_sources/*.txt` contains concise, manually reviewed paraphrases of the linked official sources. These are **not verbatim government quotations**, a complete policy corpus, live deadline verification or personalized eligibility decisions. No mockData.js facts were imported.
 
 | Slug | Official source inspected | Deliberate limits |
 |---|---|---|
@@ -16,3 +16,14 @@ Reviewed on 2026-11-07 (Asia/Calcutta). `schemes.csv` contains eight actual sche
 Resource UUIDs are deterministic from corpus slugs, not invented authentication identities. Empty document arrays mean the consulted evidence does not establish a complete checklist. Application links are never invented: the UI links to the reviewed source and tells applicants to check current terms there.
 
 Validation: `python -m app.scripts.ingest_schemes --validate-only` with `PYTHONPATH=services/api`. This checks file/CSV consistency and boundaries; it does not pretend to verify that an official page has not changed since review. Changes require manual source review and rerunning ingestion. See [Phase 3 setup](../docs/phase-3-setup.md) for migration/provider configuration and actual execution limits.
+
+## Additions reviewed 2026-11-09
+
+- `pm-sym`: [Ministry of Labour backgrounder, 4 March 2025](https://www.pib.gov.in/PressReleasePage.aspx?PRID=2108082&lang=2&reg=3). Age, monthly income, unorganised work and pension/tax exclusions are explicit; the ministry links to https://maandhan.in/ for applications. Listed documents are source-supported records, not a universal checklist.
+- `ignoaps`, `ignwps`, `igndps`: [Ladakh Social Welfare pension page](https://helphub.ladakh.gov.in/landing/pension). These are Central NSAP schemes with coverage limited here to the reviewed Ladakh implementation. Age and BPL conditions, widow status and disability percentage are scheme-specific. No nationwide document checklist, income ceiling or benefit amount is inferred. A different state requires additional evidence, rather than an exclusion from the national scheme.
+
+The CSV adds `department`, `scope`, optional `application_url` and `eligibility_rules_json`. Existing identifiers, prose, URLs, review dates, documents and source notes are preserved. `eligibility_rules_json` holds version 1 conditions with exact supporting source-note passages and explicit unmodeled conditions. Ingestion stores these additions in the existing `schemes.rules_json`; no migration is needed. A `coverage` condition describes source coverage, not a domicile requirement. Every record now has at least one supported structured condition. PM-KISAN records its explicit income-tax exclusion while retaining land/family/exclusion verification as unresolved; it cannot imply approval. Legacy CSVs without the added columns remain readable.
+
+Validation also rejects unsupported rule fields/operators/types, changed evidence, duplicate source-file associations and unassociated source notes. Original eight records have a canonical-field digest regression test. New source notes are curated paraphrases; review dates describe this review and do not certify continuing availability. Some NSAP guideline/PDF fetches failed, so the accessible Ladakh source defines the additions' regional limits.
+
+The current Phase 1 review rechecked PM-SYM, PM-KISAN and the Ladakh sources. Ladakh pension records include only the regional document records supported there. Cleaning removes BOM/control characters and normalizes spacing while preserving paragraphs. Chunks target approximately 250 to 450 tokens using a documented English four-character estimate; short sources/tails remain shorter. `clean-paragraph-v2` and content-derived UUIDs preserve superseded chunks as inactive during authorized reingestion. Stored metadata includes scheme ID, source URL, heading, review date, source file, evidence kind, content hash, chunk version and estimated token count.

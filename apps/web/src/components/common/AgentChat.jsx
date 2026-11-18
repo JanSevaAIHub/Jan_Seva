@@ -3,7 +3,7 @@ import { Send, Sparkles } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 
 export function AgentChat({ compact = false }) {
-  const { agentMessages, agentDraft, setAgentDraft, agentError, agentTyping, sendAgentMessage } = useApp()
+  const { citizenMessages: agentMessages, citizenDraft: agentDraft, setCitizenDraft: setAgentDraft, citizenError: agentError, citizenTyping: agentTyping, sendCitizenMessage: sendAgentMessage } = useApp()
   const bottom = useRef(null)
   useEffect(() => { bottom.current?.scrollIntoView({ block: 'nearest' }) }, [agentMessages, agentTyping])
   const submit = event => { event.preventDefault(); sendAgentMessage() }
