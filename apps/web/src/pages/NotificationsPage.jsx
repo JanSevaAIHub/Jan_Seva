@@ -37,7 +37,7 @@ export function NotificationsPage() {
             Notifications &amp; Activity Updates
           </h1>
           <p className="text-xs text-slate-500">
-            Notifications are not connected. Open My Requests for saved ticket statuses and audit history.
+            Activity from your accessible ticket history. Read marks last for this browsing session.
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export function NotificationsPage() {
               {item.type === 'status' && (
                 <button
                   type="button"
-                  onClick={() => navigate('/track')}
+                  onClick={() => navigate(`/track?id=${item.complaintId}`)}
                   className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-violet-300 text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-all flex items-center gap-1"
                 >
                   <span>Track</span>
@@ -137,7 +137,7 @@ export function NotificationsPage() {
         {filtered.length === 0 && (
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs space-y-2">
             <Bell size={28} className="mx-auto text-slate-300" />
-            <div className="font-bold text-slate-700">Notifications are unavailable</div>
+            <div className="font-bold text-slate-700">No ticket updates match this filter</div>
             <Link to="/requests" className="text-violet-700 underline">View My Requests and audit history</Link>
           </div>
         )}

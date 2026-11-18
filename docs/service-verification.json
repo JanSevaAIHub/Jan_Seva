@@ -1,0 +1,24 @@
+﻿{
+  "project_match": true,
+  "missing_variables": [
+    "DATABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "OPENAI_API_KEY",
+    "LLM_MODEL",
+    "EMBEDDING_MODEL",
+    "EMBEDDING_DIMENSIONS"
+  ],
+  "auth_settings": {
+    "http_status": 200,
+    "email_enabled": true
+  },
+  "jwks": {
+    "http_status": 200,
+    "algorithms": [
+      "ES256"
+    ]
+  },
+  "database": "blocked_missing_DATABASE_URL_or_project_mismatch",
+  "storage_bucket": "blocked_missing_SUPABASE_SERVICE_ROLE_KEY_or_project_mismatch",
+  "live_model": "not_called_by_read_only_probe"
+}

@@ -37,6 +37,7 @@ export function ComplaintReviewModal() {
           </div>
           <button
             aria-label="Close complaint review"
+            disabled={complaintSaving}
             onClick={() => setReviewModalComplaint(null)}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
           >
@@ -65,7 +66,7 @@ export function ComplaintReviewModal() {
                 <div className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
                   <Building size={12} /> Suggested Dept
                 </div>
-                <div className="text-xs font-semibold text-slate-800 mt-0.5">{reviewModalComplaint.department || 'Urban Infrastructure Dept'}</div>
+                <div className="text-xs font-semibold text-slate-800 mt-0.5">{reviewModalComplaint.department || 'Municipal citizen helpdesk'}</div>
               </div>
             </div>
 
@@ -84,6 +85,7 @@ export function ComplaintReviewModal() {
             </div>
           </div>
 
+          {reviewModalComplaint.photo && <p className="text-xs text-violet-800">Selected evidence: {reviewModalComplaint.photo.name} · {(reviewModalComplaint.photo.size / 1024).toFixed(1)} KB. The photo uploads after the internal ticket is saved.</p>}
           {/* Explicit Scope Guardrail Notice */}
           <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-start gap-2.5">
             <ShieldAlert size={18} className="text-amber-600 flex-none mt-0.5" />
@@ -99,6 +101,7 @@ export function ComplaintReviewModal() {
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
           <button
             onClick={() => setReviewModalComplaint(null)}
+            disabled={complaintSaving}
             className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
           >
             Edit Details

@@ -1,7 +1,7 @@
 import { useApp } from '../../context/AppContext'
 
 export function ComplaintFeedback() {
-  const { session, authLoading, authError, complaintsLoading, complaintsError, refreshComplaints, switchUserRole } = useApp()
+  const { session, authLoading, authError, complaintsLoading, complaintsError, complaintsTruncated, refreshComplaints, switchUserRole } = useApp()
   return (
     <div className="text-xs space-y-2" aria-live="polite">
       {authLoading ? <p>Loading your session…</p> : !session && (
@@ -12,6 +12,7 @@ export function ComplaintFeedback() {
       )}
       {authError && <p role="alert" className="text-rose-700">{authError}</p>}
       {complaintsLoading && <p>Loading saved complaints…</p>}
+      {complaintsTruncated && <p>Showing the latest 1,000 accessible tickets. Counts and charts cover these loaded records.</p>}
       {complaintsError && <p role="alert" className="text-rose-700">{complaintsError} <button onClick={() => refreshComplaints()} className="underline">Retry</button></p>}
     </div>
   )

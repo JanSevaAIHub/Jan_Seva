@@ -17,7 +17,8 @@ import {
   Bookmark
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import heroBg from '../assets/hero-bg.png'
+import { AgentChat } from '../components/common/AgentChat'
+const heroBg = Object.values(import.meta.glob('../assets/hero-bg.png', { eager: true, query: '?url', import: 'default' }))[0]
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
 
 const PROMPT_CHIPS = [
@@ -59,7 +60,7 @@ export function Home() {
       <section 
         className="relative overflow-hidden rounded-[24px] border border-slate-200/90 shadow-sm min-h-[340px] flex items-center bg-cover bg-center"
         style={{
-          backgroundImage: `url(${heroBg})`,
+          backgroundImage: heroBg ? `url(${heroBg})` : 'linear-gradient(120deg, #fff 35%, #eeecfa 75%, #d9f2f0)',
           backgroundPosition: 'right 30%',
           backgroundSize: 'cover'
         }}
@@ -87,7 +88,7 @@ export function Home() {
               <span>Search reviewed schemes</span>
             </div>
 
-            <p className="text-[11px] text-slate-500">Scheme search only. General-purpose chat and voice are not available here; ask source-grounded scheme questions on the next page.</p>
+            <p className="text-[11px] text-slate-500">Search the reviewed collection below, or message the Citizen AI Assistant.</p>
             {/* Input Row */}
             <form onSubmit={handleSearch} className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-full px-4 py-1.5 shadow-sm focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
               <Search size={17} className="text-slate-400 flex-none" />
@@ -135,6 +136,8 @@ export function Home() {
         </div>
       </section>
 
+      <AgentChat compact />
+
       {/* ================= 4 QUICK ACTION CARDS ================= */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Find Schemes */}
@@ -171,7 +174,7 @@ export function Home() {
               Check Eligibility
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Review published conditions; personal eligibility assessment is unavailable
+              Screen reviewed conditions using an editable beneficiary profile
             </p>
           </div>
           <div className="self-end mt-2 text-violet-600 group-hover:translate-x-1 transition-transform">

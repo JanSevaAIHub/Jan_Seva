@@ -13,14 +13,32 @@ from app.ai.scheme_schemas import SchemeAnswer, SchemeAsk, SchemeCard
 from app.config import ConfigurationError
 from app.db import get_db
 from app.models import Scheme
+from app.ai.eligibility import EligibilityProfile, screen
+from app.schemas import APIModel
+from uuid import UUID
+from typing import Literal
 
 router = APIRouter(prefix="/schemes", tags=["schemes"])
 model_budget = ModelBudget()
 
 
+class EligibilityRequest(APIModel):
+    scheme_id: UUID
+    profile: EligibilityProfile
+
+
+@router.post("/eligibility")
+def scheme_eligibility(data: EligibilityRequest, db: Session = Depends(get_db)):
+    scheme = db.get(Scheme, data.scheme_id)
+    if scheme is None or not official_url(scheme.source_url):
+        raise HTTPException(404, detail={"code": "SCHEME_NOT_FOUND", "message": "Reviewed scheme not found."})
+    return {**screen(scheme.id, data.profile), "source_url": scheme.source_url,
+        "reviewed_at": scheme.reviewed_at, "title": scheme.title}
+
+
 def model_request_budget(request: Request):
     # Plain stored-record listing incurs no model usage and remains available.
-    if request.method == "GET" and "query" not in request.query_params:
+    if request.method == "GET" and ("query" not in request.query_params or request.query_params.get("search_mode") == "keyword"):
         yield
         return
     client = request.client.host if request.client else "unknown"
@@ -41,7 +59,7 @@ def card(scheme: Scheme) -> SchemeCard:
 
 def unavailable(error):
     if isinstance(error, ConfigurationError):
-        return HTTPException(503, detail={"code": "RAG_NOT_CONFIGURED", "message": str(error)})
+        return HTTPException(503, detail={"code": "RAG_NOT_CONFIGURED", "message": "Scheme AI is not configured. You can still browse stored schemes and screen reviewed conditions."})
     return HTTPException(503, detail={"code": "MODEL_UNAVAILABLE", "message": "The embedding service is temporarily unavailable. Please retry."})
 
 
@@ -49,8 +67,11 @@ def unavailable(error):
 def list_schemes(query: str | None = Query(default=None, min_length=3, max_length=1000),
                   state: str | None = Query(default=None, min_length=2, max_length=100),
                   category: str | None = Query(default=None, min_length=2, max_length=100),
+                  search_mode: Literal["semantic", "keyword"] = "semantic",
                   limit: int = Query(default=10, ge=1, le=50), db: Session = Depends(get_db)):
-    if query is not None:
+    if query is not None and len(query.strip()) < 3:
+        raise HTTPException(422, detail={"code": "INVALID_QUERY", "message": "Enter at least three non-whitespace characters."})
+    if query is not None and search_mode == "semantic":
         if len(query.strip()) < 3:
             raise HTTPException(422, detail={"code": "INVALID_QUERY", "message": "Enter at least three non-whitespace characters."})
         try:
@@ -61,6 +82,8 @@ def list_schemes(query: str | None = Query(default=None, min_length=3, max_lengt
         schemes = {s.id: s for s in db.scalars(select(Scheme).where(Scheme.id.in_(ids)))}
         return [card(schemes[id]) for id in ids if id in schemes]
     result = select(Scheme).order_by(Scheme.title).limit(limit)
+    if query is not None:
+        result = result.where(Scheme.title.icontains(query.strip(), autoescape=True) | Scheme.description.icontains(query.strip(), autoescape=True))
     if state:
         result = result.where((func.lower(Scheme.state) == state.strip().lower()) | (Scheme.state == "National"))
     if category:

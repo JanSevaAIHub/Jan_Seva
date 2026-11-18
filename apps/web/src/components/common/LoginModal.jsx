@@ -4,17 +4,25 @@ import { useApp } from '../../context/AppContext'
 import { useDialog } from '../../lib/useDialog'
 
 export function LoginModal() {
-  const { loginRole, setLoginRole, signIn, authError, authBusy } = useApp()
+  const { loginRole, setLoginRole, signIn, signUp, authError, authBusy } = useApp()
+  const [creating, setCreating] = useState(false)
+  const [notice, setNotice] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const dialogRef = useDialog(Boolean(loginRole), () => setLoginRole(null), authBusy)
-  const demoEmail = import.meta.env.DEV ? import.meta.env.VITE_DEMO_EMAIL : ''
-  const demoPassword = import.meta.env.DEV ? import.meta.env.VITE_DEMO_PASSWORD : ''
-  useEffect(() => { setEmail(''); setPassword('') }, [loginRole])
+  useEffect(() => { setEmail(''); setPassword(''); setCreating(false); setNotice('') }, [loginRole])
   if (!loginRole) return null
   const submit = async event => {
     event.preventDefault()
-    if (await signIn(email, password)) { setPassword(''); setLoginRole(null) }
+    if (authBusy) return
+    if (creating) {
+      const result = await signUp(email, password)
+      if (result.ok) {
+        setPassword('')
+        if (result.confirmationRequired) { setNotice('Check your email to confirm your account, then sign in.'); setCreating(false) }
+        else setLoginRole(null)
+      }
+    } else if (await signIn(email, password)) { setPassword(''); setLoginRole(null) }
   }
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
@@ -25,25 +33,17 @@ export function LoginModal() {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-xs text-slate-500">Use your provisioned account{loginRole === 'officer' ? ' (demo: R. Singh)' : ' (demo: Arjun Mishra)'}.</p>
-          {demoEmail && demoPassword && <button
-            type="button"
-            onClick={() => {
-              setEmail(demoEmail)
-              setPassword(demoPassword)
-            }}
-            className="text-[11px] font-bold text-violet-700 hover:underline bg-violet-50 px-2 py-0.5 rounded border border-violet-200"
-          >
-            Auto-fill
-          </button>}
         </div>
         <label className="block text-xs font-semibold">Email
           <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
         </label>
         <label className="block text-xs font-semibold">Password
-          <input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
+          <input type="password" autoComplete={creating ? 'new-password' : 'current-password'} minLength={creating ? 8 : undefined} required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" />
         </label>
         {authError && <p role="alert" className="text-xs text-rose-700">{authError}</p>}
-        <button disabled={authBusy} className="w-full py-2 rounded-xl bg-violet-600 text-white text-xs font-bold disabled:opacity-50">{authBusy ? 'Signing in…' : 'Sign in'}</button>
+        {notice && <p role="status" className="text-xs text-teal-700">{notice}</p>}
+        <button disabled={authBusy} className="w-full py-2 rounded-xl bg-violet-600 text-white text-xs font-bold disabled:opacity-50">{authBusy ? 'Please wait…' : creating ? 'Create citizen account' : 'Sign in'}</button>
+        {loginRole !== 'officer' && <button type="button" disabled={authBusy} onClick={() => setCreating(v => !v)} className="text-xs text-violet-700 underline">{creating ? 'Already registered? Sign in' : 'New citizen? Create account'}</button>}
       </form>
     </div>
   )

@@ -1,0 +1,24 @@
+[
+  {
+    "run": 1,
+    "health_http": 200,
+    "health": {
+      "status": "ok"
+    },
+    "clarification_http": 200,
+    "clarification_intent": "unknown",
+    "cors_http": 200,
+    "cors_origin": "http://127.0.0.1:5173"
+  },
+  {
+    "run": 2,
+    "health_http": 200,
+    "health": {
+      "status": "ok"
+    },
+    "clarification_http": 200,
+    "clarification_intent": "unknown",
+    "cors_http": 200,
+    "cors_origin": "http://127.0.0.1:5173"
+  }
+]

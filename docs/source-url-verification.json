@@ -1,0 +1,70 @@
+{
+  "checked_at_utc": "2026-11-18T23:10:50.406249+00:00",
+  "scope": "Reachability and official destination only, not a fresh verification of every scheme condition.",
+  "results": [
+    {
+      "scheme": "pm-kisan",
+      "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2191651&lang=2&reg=48",
+      "http_status": 200,
+      "final_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2191651&lang=2&reg=48",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "nmmss",
+      "source_url": "https://www.pib.gov.in/newsite/erelcontent.aspx?lang=2&reg=48&relid=294184",
+      "http_status": 200,
+      "final_url": "https://www.pib.gov.in/newsite/erelcontent.aspx?lang=2&reg=48&relid=294184",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "pmsby",
+      "source_url": "https://financialservices.gov.in/pmsby",
+      "http_status": 200,
+      "final_url": "https://financialservices.gov.in/pmsby",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "pmjjby",
+      "source_url": "https://financialservices.gov.in/pmjjby",
+      "http_status": 200,
+      "final_url": "https://financialservices.gov.in/pmjjby",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "apy",
+      "source_url": "https://sansad.in/getFile/loksabhaquestions/annex/182/AU2081_we23z8.pdf?source=pqals",
+      "http_status": 200,
+      "final_url": "https://sansad.in/getFile/loksabhaquestions/annex/182/AU2081_we23z8.pdf?source=pqals",
+      "official_destination": true,
+      "content_type": "application/pdf"
+    },
+    {
+      "scheme": "ssy",
+      "source_url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44",
+      "http_status": 200,
+      "final_url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=157019&lang=1&reg=44",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "pm-vishwakarma",
+      "source_url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=159998&lang=1&reg=20",
+      "http_status": 200,
+      "final_url": "https://www.pib.gov.in/PressNoteDetails.aspx?ModuleId=3&NoteId=159998&lang=1&reg=20",
+      "official_destination": true,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "scheme": "punjab-ashirwad",
+      "source_url": "https://faridkot.nic.in/department-of-social-justice-empowerment-minorities/",
+      "http_status": 200,
+      "final_url": "https://faridkot.nic.in/department-of-social-justice-empowerment-minorities/",
+      "official_destination": true,
+      "content_type": "text/html; charset=UTF-8"
+    }
+  ]
+}

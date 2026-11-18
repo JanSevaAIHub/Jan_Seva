@@ -1,4 +1,4 @@
-"""Five core models. Supabase owns auth.users; the application never creates it."""
+"""Application models. Supabase owns auth.users; the app never creates it."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -165,4 +165,29 @@ class ComplaintEvent(Base):
     actor: Mapped[Profile] = relationship()
 
 
-CORE_TABLES = [Profile.__table__, Scheme.__table__, SchemeChunk.__table__, Complaint.__table__, ComplaintEvent.__table__]
+class ComplaintSubmission(Base):
+    __tablename__ = "complaint_submissions"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="RESTRICT"), primary_key=True)
+    request_key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    complaint_id: Mapped[UUID] = mapped_column(ForeignKey("complaints.id", ondelete="RESTRICT"), unique=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+
+
+class ComplaintEvidence(Base):
+    __tablename__ = "complaint_evidence"
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="evidence_size_positive"),
+        CheckConstraint("mime_type IN ('image/jpeg', 'image/png', 'image/webp')", name="evidence_mime_allowed"),
+    )
+    # One optional photograph per complaint; replaces atomically at metadata level.
+    complaint_id: Mapped[UUID] = mapped_column(ForeignKey("complaints.id", ondelete="RESTRICT"), primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid, default=uuid4, unique=True)
+    object_path: Mapped[str] = mapped_column(String(250), unique=True)
+    filename: Mapped[str] = mapped_column(String(120))
+    mime_type: Mapped[str] = mapped_column(String(30))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+CORE_TABLES = [Profile.__table__, Scheme.__table__, SchemeChunk.__table__, Complaint.__table__, ComplaintEvent.__table__, ComplaintSubmission.__table__, ComplaintEvidence.__table__]

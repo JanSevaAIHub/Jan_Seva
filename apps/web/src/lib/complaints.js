@@ -3,6 +3,15 @@ export const CATEGORY_LABELS = {
   sanitation: 'Sanitation & Garbage', streetlight: 'Streetlight & Public Lighting', other: 'Other',
 }
 export const NEXT_STATUS = { LOCAL_SUBMITTED: 'UNDER_REVIEW', UNDER_REVIEW: 'IN_PROGRESS', IN_PROGRESS: 'RESOLVED' }
+export const DEPARTMENTS = { road: 'Roads & Transport Dept', water: 'Water Supply Dept', sanitation: 'Sanitation Dept', streetlight: 'Urban Infrastructure Dept', other: 'Municipal citizen helpdesk' }
+
+export function ticketNotifications(tickets) {
+  return tickets.flatMap(ticket => ticket.events.map(event => ({
+    id: event.id, complaintId: ticket.id, type: 'status', read: false,
+    title: event.old_status === event.new_status ? 'Internal ticket updated' : `Internal status: ${event.new_status.replaceAll('_', ' ')}`,
+    message: `${ticket.title}: ${event.note}`, time: new Date(event.event_time).toLocaleString(), eventTime: event.event_time,
+  }))).sort((a, b) => Date.parse(b.eventTime) - Date.parse(a.eventTime)).slice(0, 40)
+}
 
 export function complaintInput(draft) {
   const category = Object.entries(CATEGORY_LABELS).find(([key, label]) => key === draft.category || label === draft.category)?.[0]
@@ -26,7 +35,7 @@ export function complaintView(record) {
     priority: 'Not assessed', department: record.assigned_officer_id ? 'Assigned officer' : 'Awaiting assignment',
     expectedResolution: 'Not estimated', officerNotes: events.filter(e => e.old_status !== null && e.old_status !== e.new_status).at(-1)?.note,
     timeline: events.map((event, index) => ({
-      step: event.old_status === event.new_status ? 'Filing reference recorded (user reported)' : event.new_status.replaceAll('_', ' '),
+      step: event.old_status === event.new_status ? (event.note.startsWith('Citizen recorded') ? 'Filing reference recorded (user reported)' : 'Internal ticket update') : event.new_status.replaceAll('_', ' '),
       time: new Date(event.event_time).toLocaleString(),
       desc: `${event.note} (Actor: ${event.actor_id})`, done: true, active: index === events.length - 1,
     })),

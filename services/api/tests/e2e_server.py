@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import jwt
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
@@ -28,6 +28,8 @@ from app.db import Base, get_db
 from app.main import app
 from app.models import CORE_TABLES, Profile, Role, Scheme
 from app.ai.corpus import read_corpus
+from app.routers import evidence
+from app.storage import StorageError
 
 # The fake Auth endpoints also receive Supabase SDK headers (apikey, client info).
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5174"],
@@ -38,11 +40,33 @@ jwk = jwt.algorithms.ECAlgorithm.to_jwk(key.public_key(), as_dict=True)
 jwk.update(alg="ES256", kid="isolated-e2e-key", use="sig")
 identities = {email: {"id": str(uuid4()), "email": email, "name": name, "role": role}
     for email, name, role in [("arjun@example.test", "Arjun Mishra", Role.CITIZEN),
+                               ("other@example.test", "Other Citizen", Role.CITIZEN),
                                ("singh@example.test", "R. Singh", Role.OFFICER)]}
 os.environ["DEMO_CITIZEN_USER_ID"] = identities["arjun@example.test"]["id"]
 os.environ["DEMO_OFFICER_USER_ID"] = identities["singh@example.test"]["id"]
 password = os.environ["E2E_AUTH_PASSWORD"]
 refresh_tokens = {}
+evidence_objects = {}
+evidence_links = {}
+
+
+class IsolatedStorage:
+    """Storage service double for browser tests; never installed by app.main."""
+    def upload(self, path, data, mime):
+        evidence_objects[path] = (data, mime)
+
+    def cleanup(self, path):
+        evidence_objects.pop(path, None)
+
+    def signed_url(self, path):
+        if path not in evidence_objects:
+            raise StorageError('Isolated evidence is unavailable')
+        token = secrets.token_urlsafe(24)
+        evidence_links[token] = (path, time() + 300)
+        return f'http://127.0.0.1:8765/storage/v1/object/sign/complaint-evidence/{path}?token={token}'
+
+
+evidence.EvidenceStorage = IsolatedStorage
 
 
 @asynccontextmanager
@@ -115,6 +139,28 @@ async def login(request: Request):
 @app.post("/auth/v1/logout", status_code=204)
 def logout():
     return None
+
+
+@app.get('/storage/v1/object/sign/complaint-evidence/{path:path}')
+def test_private_photo(path: str, token: str = ''):
+    link = evidence_links.get(token)
+    if not link or link[0] != path or link[1] < time() or path not in evidence_objects:
+        return Response(status_code=403)
+    content, mime = evidence_objects[path]
+    return Response(content, media_type=mime, headers={'Cache-Control':'private, no-store'})
+
+
+@app.post('/auth/v1/signup')
+async def test_signup(request: Request):
+    data = await request.json()
+    email = data.get('email', '')
+    if not email.endswith('@example.test') or len(data.get('password', '')) < 8:
+        return JSONResponse(status_code=400, content={'msg':'Invalid isolated signup request'})
+    user = {'id':str(uuid4()), 'email':email, 'name':'Citizen', 'role':Role.CITIZEN}
+    identities[email] = user
+    # Simulate GoTrue email confirmation. No real email is sent.
+    return {'id':user['id'], 'email':email, 'aud':'authenticated', 'role':'authenticated',
+        'created_at':datetime.now(timezone.utc).isoformat(), 'app_metadata':{}, 'user_metadata':{}}
 
 
 if __name__ == "__main__":

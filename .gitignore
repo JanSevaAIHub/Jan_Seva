@@ -3,6 +3,7 @@ dist/
 dist-ssr/
 .venv/
 .tmp/
+services/api/supabase/.temp/
 __pycache__/
 *.py[cod]
 .pytest_cache/

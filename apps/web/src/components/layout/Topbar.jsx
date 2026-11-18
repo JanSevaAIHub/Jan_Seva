@@ -86,7 +86,7 @@ export function Topbar() {
                 </button>
               </div>
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                {notifications.length === 0 && <p className="p-3 text-xs text-slate-500">Notifications are not connected. Use My Requests for saved updates.</p>}
+                {notifications.length === 0 && <p className="p-3 text-xs text-slate-500">No saved ticket updates are loaded.</p>}
                 {notifications.map(n => (
                   <div key={n.id} className="p-3 hover:bg-slate-50 transition-colors rounded-xl text-xs space-y-1">
                     <div className="flex items-center justify-between">

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
+import { EvidencePanel } from '../components/complaints/EvidencePanel'
 
 export function TrackStatus() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -158,6 +159,8 @@ export function TrackStatus() {
                 <span>{selectedTicket.locality}</span>
               </div>
             </div>
+
+            <EvidencePanel key={`${session?.user.id}-${selectedTicket.id}`} ticket={selectedTicket} />
 
             {selectedTicket.officerNotes && (
               <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-xs text-indigo-950">

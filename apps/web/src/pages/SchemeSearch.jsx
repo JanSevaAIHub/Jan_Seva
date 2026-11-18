@@ -23,6 +23,7 @@ import {
   ChevronDown
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { EligibilityChecker } from '../components/schemes/EligibilityChecker'
 
 export function SchemeSearch() {
   const {
@@ -39,12 +40,11 @@ export function SchemeSearch() {
     currentUser,
     session,
     selectedState, setSelectedState
+    , schemeChatDraft: chatInput, setSchemeChatDraft: setChatInput,
+    selectedSectorFilter: sectorFilter, setSelectedSectorFilter: setSectorFilter
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('all') // 'recommended' | 'all' | 'saved'
-  const [sectorFilter, setSectorFilter] = useState('All')
-  const [chatInput, setChatInput] = useState('')
-  useEffect(() => { setChatInput('') }, [session?.user.id])
   const chatBottomRef = useRef(null)
 
   // Scroll chat to bottom when message arrives
@@ -97,7 +97,7 @@ export function SchemeSearch() {
             Discover Government Schemes with AI
           </h1>
           <p className="text-xs text-slate-500">
-            Search reviewed official scheme evidence. Check published conditions; this service does not determine your eligibility.
+            Search reviewed scheme evidence and screen published conditions. Final eligibility requires official verification.
           </p>
         </div>
       </div>
@@ -196,14 +196,14 @@ export function SchemeSearch() {
           <div className="p-2 bg-white border-t border-slate-100 flex gap-1.5 overflow-x-auto text-[11px]">
             <button
               disabled={isAiTyping}
-              onClick={() => sendChatMessage('What documents do I need for PM Kisan?', sectorFilter)}
+              onClick={() => setChatInput('What documents do I need for PM Kisan?')}
               className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-violet-50 hover:text-violet-700 text-slate-600 whitespace-nowrap"
             >
               PM Kisan docs?
             </button>
             <button
               disabled={isAiTyping}
-              onClick={() => sendChatMessage('What documents are required for Sukanya Samriddhi Yojana?', sectorFilter)}
+              onClick={() => setChatInput('What documents are required for Sukanya Samriddhi Yojana?')}
               className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-violet-50 hover:text-violet-700 text-slate-600 whitespace-nowrap"
             >
               SSY documents?
@@ -212,14 +212,15 @@ export function SchemeSearch() {
 
           {/* Sticky Chat Input */}
           <form onSubmit={handleSendChat} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
-            <input
-              type="text"
+            <textarea
+              aria-label="Scheme assistant question"
+              rows={2}
               value={chatInput}
-              minLength={3}
               maxLength={1000}
               onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (chatInput.trim().length >= 3) handleSendChat() } }}
               placeholder="Ask a follow-up question..."
-              className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-violet-500"
+              className="min-w-0 flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-violet-500"
             />
             <button
               type="button"
@@ -410,6 +411,7 @@ export function SchemeSearch() {
 
         {/* ================= RIGHT COLUMN: Profile & Documents (3 Cols) ================= */}
         <div className="lg:col-span-3 space-y-4">
+          <EligibilityChecker />
           {/* User Profile Card */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center gap-3">

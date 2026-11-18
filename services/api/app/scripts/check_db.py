@@ -25,4 +25,4 @@ if __name__ == "__main__":
     except SQLAlchemyError:
         print("Database check failed. Check connectivity, privileges and whether migration 001 was applied.", file=sys.stderr)
         sys.exit(1)
-    print("Database connected; five core tables, constraints and indexes verified.")
+    print("Database connected; application tables, constraints and indexes verified.")

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { X, ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, UserCheck } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { NEXT_STATUS } from '../../lib/complaints'
+import { NEXT_STATUS, CATEGORY_LABELS, DEPARTMENTS } from '../../lib/complaints'
 import { useDialog } from '../../lib/useDialog'
+import { EvidencePanel } from '../complaints/EvidencePanel'
 
 export function TicketDetailModal() {
-  const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus } = useApp()
+  const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus, updateComplaintRouting } = useApp()
+  const [routingCategory, setRoutingCategory] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [note, setNote] = useState('')
 
@@ -14,9 +16,10 @@ export function TicketDetailModal() {
   const dialogRef = useDialog(Boolean(officerTicketModal), () => setOfficerTicketModal(null), saving)
   useEffect(() => {
     setSelectedStatus(NEXT_STATUS[officerTicketModal?.status] || '')
+    setRoutingCategory(officerTicketModal?.categoryCode || '')
     setNote('')
     setError('')
-  }, [officerTicketModal?.id, officerTicketModal?.status])
+  }, [officerTicketModal?.id, officerTicketModal?.status, officerTicketModal?.categoryCode])
   if (!officerTicketModal) return null
 
   const handleUpdate = async () => {
@@ -80,6 +83,22 @@ export function TicketDetailModal() {
             </div>
           </div>
 
+          <EvidencePanel key={officerTicketModal.id} ticket={officerTicketModal} />
+          <details className="text-xs space-y-2 border-t pt-3">
+            <summary className="font-bold text-violet-700 cursor-pointer">Review department routing</summary>
+            <p className="mt-2">Change the internal category and recommended department. This records an audit event; government referral remains a separate action.</p>
+            <select aria-label="Routing category" value={routingCategory} disabled={saving} onChange={e => setRoutingCategory(e.target.value)} className="w-full border rounded-lg p-2 mt-2">
+              {Object.entries(CATEGORY_LABELS).map(([key,label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <p>Recommended department: {DEPARTMENTS[routingCategory]}</p>
+            <button type="button" disabled={saving || routingCategory === officerTicketModal.categoryCode} className="bg-violet-600 text-white rounded-lg p-2 disabled:opacity-50" onClick={async () => {
+              if (saving) return
+              setSaving(true); setError('')
+              try { await updateComplaintRouting(officerTicketModal.id, routingCategory) }
+              catch (e) { setError(e.message) }
+              finally { setSaving(false) }
+            }}>Save internal routing</button>
+          </details>
           {/* Timeline / Audit trail */}
           <div>
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Audit History</div>

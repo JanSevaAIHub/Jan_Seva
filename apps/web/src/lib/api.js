@@ -18,7 +18,7 @@ export function onUnauthorized(listener) {
 
 async function request(path, accessToken, options = {}) {
   if (!path.startsWith('/') || path.startsWith('//')) throw new ApiError('Invalid API path.', 0, 'INVALID_PATH')
-  const { body, headers, signal, timeoutMs = path === '/schemes/ask' ? 100000 : 15000, ...rest } = options
+  const { body, headers, signal, timeoutMs = /\/ask$|\/message$|\/analyze$/.test(path) ? 100000 : path.includes('/evidence') ? 60000 : 15000, ...rest } = options
   const method = (rest.method || 'GET').toUpperCase()
   if (!['GET', 'POST', 'PATCH'].includes(method)) throw new ApiError('Unsupported API method.', 0, 'INVALID_METHOD')
   const controller = new AbortController()
@@ -32,7 +32,7 @@ async function request(path, accessToken, options = {}) {
       ...rest, method, signal: controller.signal,
       headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...headers, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
-      ...(body !== undefined ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}),
+      ...(body !== undefined ? { body: typeof body === 'string' || body instanceof Blob ? body : JSON.stringify(body) } : {}),
     })
     if (response.status === 204) return null
     const raw = await response.text()

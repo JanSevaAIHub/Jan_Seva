@@ -27,11 +27,11 @@ class ModelBudget:
             if len(self.events) >= self.total or len(client_events) >= self.per_client:
                 first = self.events[0][0] if len(self.events) >= self.total else client_events[0]
                 raise HTTPException(429, detail={"code": "MODEL_RATE_LIMITED",
-                    "message": "Scheme AI request limit reached. Wait before retrying."},
+                    "message": "AI request limit reached. Wait before retrying."},
                     headers={"Retry-After": str(max(1, ceil(first + self.window - now)))})
             if self.active >= self.concurrent:
                 raise HTTPException(429, detail={"code": "MODEL_BUSY",
-                    "message": "Scheme AI is busy. Please retry shortly."}, headers={"Retry-After": "1"})
+                    "message": "AI is busy. Please retry shortly."}, headers={"Retry-After": "1"})
             # Only accepted work consumes a rate slot. Failures also count: an
             # unsuccessful provider response can still incur external cost.
             self.events.append((now, client))

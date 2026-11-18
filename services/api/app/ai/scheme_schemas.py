@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Annotated
 from uuid import UUID
 
 from pydantic import Field
@@ -17,6 +17,7 @@ class SchemeAsk(APIModel):
     profile: SchemeProfile | None = None
     state: str | None = Field(default=None, min_length=2, max_length=100)
     category: str | None = Field(default=None, min_length=2, max_length=100)
+    history: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(default_factory=list, max_length=5)
 
 
 class SchemeCard(Scheme):

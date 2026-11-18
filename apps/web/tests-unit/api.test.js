@@ -5,6 +5,31 @@ import { apiRequest, publicApiRequest, getHealth, onUnauthorized } from '../src/
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
 
+test('binary evidence preserves bytes, MIME and encoded filename with the actual bearer token', async () => {
+  const file = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' })
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.body, file)
+    assert.equal(options.headers['Content-Type'], 'image/png')
+    assert.equal(options.headers.Authorization, 'Bearer test-token')
+    assert.equal(options.headers['X-Filename'], 'photo.png')
+    return Response.json({ id: 'test-evidence' })
+  }
+  assert.deepEqual(await apiRequest('/complaints/id/evidence', 'test-token', {
+    method: 'POST', body: file, headers: { 'Content-Type': file.type, 'X-Filename': 'photo.png' },
+  }), { id: 'test-evidence' })
+})
+
+test('complaint retries forward a durable submission key without automatically replaying the write', async () => {
+  let calls = 0
+  globalThis.fetch = async (_url, options) => {
+    calls++
+    assert.equal(options.headers['Idempotency-Key'], 'test-submission-key')
+    throw new Error('Synthetic connection interruption')
+  }
+  await assert.rejects(apiRequest('/complaints', 'token', { method: 'POST', body: {}, headers: { 'Idempotency-Key': 'test-submission-key' } }), error => error.code === 'NETWORK_ERROR')
+  assert.equal(calls, 1)
+})
+
 test('one transport sends JSON and the actual bearer token for POST and PATCH', async () => {
   const calls = []
   globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return Response.json({ id: 'saved-ticket' }) }

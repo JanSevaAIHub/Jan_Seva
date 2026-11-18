@@ -2,10 +2,11 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import { supabase, authConfigurationError } from '../lib/supabase'
 import { apiRequest, publicApiRequest, onUnauthorized } from '../lib/api'
 import { schemeView, schemeAnswer } from '../lib/schemes'
-import { complaintInput, complaintView } from '../lib/complaints'
+import { complaintInput, complaintView, ticketNotifications, DEPARTMENTS } from '../lib/complaints'
 
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
+const EMPTY_DRAFT = { title: '', category: 'Streetlight & Public Lighting', description: '', locality: '', priority: 'Medium', photo: null }
 
 export function AppProvider({ children }) {
   // Only the authenticated API profile establishes the current account role.
@@ -26,6 +27,7 @@ export function AppProvider({ children }) {
   // Schemes state
   const [schemes, setSchemes] = useState([])
   const [savedSchemeIds, setSavedSchemeIds] = useState([])
+  const [eligibilityProfile, setEligibilityProfile] = useState({})
   const [activeSchemeModal, setActiveSchemeModal] = useState(null)
   const [schemeSearchQuery, setSchemeSearchQuery] = useState('')
   const [selectedSectorFilter, setSelectedSectorFilter] = useState('All')
@@ -40,9 +42,19 @@ export function AppProvider({ children }) {
   const complaintSaveBusy = useRef(false)
   const [complaintSaveError, setComplaintSaveError] = useState('')
   const [reviewModalComplaint, setReviewModalComplaint] = useState(null)
+  const [complaintDraft, setComplaintDraft] = useState(EMPTY_DRAFT)
+  const draftOwner = useRef(null)
+  const submissionKey = useRef(null)
+  const [pendingEvidence, setPendingEvidence] = useState(null)
+  const evidenceBusy = useRef(false)
+  const [evidenceMaxBytes, setEvidenceMaxBytes] = useState(5242880)
+  useEffect(() => { publicApiRequest('/complaints/evidence-config').then(c => {
+    if (Number.isInteger(c.max_bytes) && c.max_bytes > 0) setEvidenceMaxBytes(c.max_bytes)
+  }).catch(() => { /* Server validates uploads even when limits could not be fetched. */ }) }, [])
   const [packageModalComplaint, setPackageModalComplaint] = useState(null)
   const [officerTicketModal, setOfficerTicketModal] = useState(null)
-  const [routingItems] = useState([])
+  const routingItems = currentUser.role === 'officer' ? complaints.filter(c => c.status !== 'RESOLVED').slice(0, 5).map(c => ({ id: c.id, issue: c.title, targetDept: DEPARTMENTS[c.categoryCode] })) : []
+  const [complaintsTruncated, setComplaintsTruncated] = useState(false)
 
   // Notifications state
   const [notifications, setNotifications] = useState([])
@@ -60,6 +72,12 @@ export function AppProvider({ children }) {
   const schemeChatVersion = useRef(0)
   const schemeRequest = useRef(0)
   const [isAiTyping, setIsAiTyping] = useState(false)
+  const [schemeChatDraft, setSchemeChatDraft] = useState('')
+  const [agentMessages, setAgentMessages] = useState([])
+  const [agentDraft, setAgentDraft] = useState('')
+  const [agentError, setAgentError] = useState('')
+  const [agentTyping, setAgentTyping] = useState(false)
+  const agentBusy = useRef(false)
 
   const clearSchemeChat = useCallback(() => {
     schemeChatVersion.current += 1
@@ -67,6 +85,12 @@ export function AppProvider({ children }) {
     setChatMessages([])
     setSchemeChatError('')
     setIsAiTyping(false)
+    setSchemeChatDraft('')
+    setAgentMessages([])
+    setAgentDraft('')
+    setAgentError('')
+    setAgentTyping(false)
+    agentBusy.current = false
   }, [])
 
   // Add toast notification
@@ -98,12 +122,16 @@ export function AppProvider({ children }) {
     setSession(null)
     setCurrentUser(GUEST)
     setComplaints([])
+    setComplaintsTruncated(false)
     setActiveComplaint(null)
     setOfficerTicketModal(null)
     setPackageModalComplaint(null)
     setReviewModalComplaint(null)
+    setPendingEvidence(null)
+    submissionKey.current = null
     setComplaintSaveError('')
     setSavedSchemeIds([])
+    setEligibilityProfile({})
     setNotifications([])
     setToasts([])
     setAuthLoading(false)
@@ -132,6 +160,10 @@ export function AppProvider({ children }) {
       sessionToken.current = token
       accountVersion.current += 1
       if (sessionUser.current !== nextSession?.user.id) {
+        if (nextSession?.user.id) {
+          if (draftOwner.current && draftOwner.current !== nextSession.user.id) setComplaintDraft(EMPTY_DRAFT)
+          draftOwner.current = nextSession.user.id
+        }
         identityVersion.current += 1
         clearSchemeChat()
         sessionUser.current = nextSession?.user.id || null
@@ -141,8 +173,11 @@ export function AppProvider({ children }) {
         setOfficerTicketModal(null)
         setPackageModalComplaint(null)
         setReviewModalComplaint(null)
+        setPendingEvidence(null)
+        submissionKey.current = null
         setComplaintSaveError('')
         setSavedSchemeIds([])
+        setEligibilityProfile({})
         setNotifications([])
         setToasts([])
       }
@@ -181,7 +216,13 @@ export function AppProvider({ children }) {
       setCurrentUser({ ...profile, avatar: profile.name.split(' ').map(n => n[0]).join(''), completeness: 0 })
       setAuthError('')
       // A queue failure must not discard a successfully verified account role.
-      const records = await apiRequest('/complaints', session.access_token)
+      const records = []
+      for (let offset = 0; offset < 1000; offset += 100) {
+        const batch = await apiRequest(offset ? `/complaints?limit=100&offset=${offset}` : '/complaints', session.access_token)
+        if (!Array.isArray(batch)) throw new Error('The API returned an invalid complaint list. Please retry.')
+        records.push(...batch)
+        if (batch.length < 100) break
+      }
       if (!isCurrent()) return
       if (!Array.isArray(records)) throw new Error('The API returned an invalid complaint list. Please retry.')
       const tickets = records.map(complaintView)
@@ -189,6 +230,11 @@ export function AppProvider({ children }) {
       // must survive an older database snapshot returned by this request.
       if (revision !== complaintRevision.current) return
       setComplaints(tickets)
+      setComplaintsTruncated(tickets.length >= 1000)
+      setNotifications(previous => {
+        const readIds = new Set(previous.filter(n => n.read).map(n => n.id))
+        return ticketNotifications(tickets).map(n => ({ ...n, read: readIds.has(n.id) }))
+      })
       setActiveComplaint(prev => tickets.find(t => t.id === prev?.id) || tickets[0] || null)
       setOfficerTicketModal(prev => prev ? tickets.find(t => t.id === prev.id) || null : null)
       setPackageModalComplaint(prev => prev ? tickets.find(t => t.id === prev.id) || null : null)
@@ -232,19 +278,71 @@ export function AppProvider({ children }) {
     setComplaintSaving(true)
     setComplaintSaveError('')
     try {
+      const payload = complaintInput(draft)
+      const fingerprint = JSON.stringify(payload)
+      if (submissionKey.current?.fingerprint !== fingerprint) submissionKey.current = { fingerprint, key: crypto.randomUUID() }
       const saved = await apiRequest('/complaints', session?.access_token, {
-        method: 'POST', body: JSON.stringify(complaintInput(draft)),
+        method: 'POST', body: JSON.stringify(payload), headers: { 'Idempotency-Key': submissionKey.current.key },
       })
       if (version !== identityVersion.current) return null
       const ticket = applyComplaint(saved)
       setActiveComplaint(ticket)
       addToast(`Internal ticket saved: ${ticket.id}`, 'success')
+      submissionKey.current = null
+      if (draft.photo) await uploadEvidence(ticket.id, draft.photo)
       await refreshComplaints()
       return version === identityVersion.current ? ticket : null
     } catch (error) {
       if (version === identityVersion.current) setComplaintSaveError(error.message)
       return null
     } finally { complaintSaveBusy.current = false; setComplaintSaving(false) }
+  }
+
+  const uploadEvidence = async (ticketId, file) => {
+    if (evidenceBusy.current) return false
+    evidenceBusy.current = true
+    const version = identityVersion.current
+    setPendingEvidence({ ticketId, file, state: 'uploading', error: '' })
+    try {
+      await apiRequest(`/complaints/${ticketId}/evidence`, session?.access_token, {
+        method: 'POST', body: file, headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
+      })
+      if (version !== identityVersion.current) return false
+      setPendingEvidence({ ticketId, file: null, state: 'uploaded', error: '' })
+      return true
+    } catch (error) {
+      if (version === identityVersion.current) setPendingEvidence({ ticketId, file, state: 'failed', error: error.message })
+      return false
+    } finally { evidenceBusy.current = false }
+  }
+
+  const sendAgentMessage = async () => {
+    const message = agentDraft.trim()
+    if (message.length < 3 || agentBusy.current) return false
+    const version = schemeChatVersion.current
+    const history = agentMessages.slice(-10).map(m => ({ role: m.sender, content: m.text.slice(0, 5000) }))
+    agentBusy.current = true
+    setAgentTyping(true)
+    setAgentError('')
+    const id = crypto.randomUUID()
+    setAgentMessages(previous => [...previous, { id, sender: 'user', text: message }])
+    try {
+      const reply = await publicApiRequest('/agent/message', { method: 'POST', body: { message, history, profile: { state: selectedState === 'All' ? null : selectedState } } })
+      if (version !== schemeChatVersion.current) return false
+      if (typeof reply.answer !== 'string' || !Array.isArray(reply.citations) || !Array.isArray(reply.tool_trace) ||
+        !['scheme', 'complaint', 'mixed', 'unknown'].includes(reply.intent)) throw new Error('The assistant returned an invalid answer. Please retry.')
+      if (['grounded_extracts', 'extractive_fallback', 'insufficient_evidence'].includes(reply.mode)) schemeAnswer(reply)
+      else if (reply.citations.length || !['clarification', 'ai_suggestion'].includes(reply.mode)) throw new Error('The assistant returned invalid sources. Please retry.')
+      setAgentMessages(previous => [...previous, { id: crypto.randomUUID(), sender: 'assistant', text: reply.answer, citations: reply.citations, mode: reply.mode }])
+      setAgentDraft(current => current.trim() === message ? '' : current)
+      return true
+    } catch (error) {
+      if (version === schemeChatVersion.current) {
+        setAgentError(error.message)
+        setAgentMessages(previous => previous.filter(m => m.id !== id))
+      }
+      return false
+    } finally { if (version === schemeChatVersion.current) { agentBusy.current = false; setAgentTyping(false) } }
   }
 
   const updateComplaintStatus = async (ticketId, status, note = '') => {
@@ -270,7 +368,17 @@ export function AppProvider({ children }) {
     await refreshComplaints()
   }
 
-  const handleRouteAction = () => addToast('Department routing is not available in this phase.', 'info')
+  const handleRouteAction = async id => {
+    try { setOfficerTicketModal(await loadComplaint(id)) }
+    catch (error) { addToast(error.message, 'warning') }
+  }
+  const updateComplaintRouting = async (id, category) => {
+    const version = identityVersion.current
+    const saved = await apiRequest(`/officer/complaints/${id}/routing`, session?.access_token, { method: 'PATCH', body: { category } })
+    if (version !== identityVersion.current) throw new Error('The account changed. Please reopen the ticket.')
+    applyComplaint(saved)
+    await refreshComplaints()
+  }
 
   const loadSchemes = useCallback(async ({ query = '', state = '', category = '' } = {}) => {
     const request = ++schemeRequest.current
@@ -278,7 +386,7 @@ export function AppProvider({ children }) {
     setSchemesError('')
     try {
       const params = new URLSearchParams({ limit: '10' })
-      if (query.trim()) params.set('query', query.trim())
+      if (query.trim()) { params.set('query', query.trim()); params.set('search_mode', 'keyword') }
       if (state && state !== 'All') params.set('state', state)
       if (category && category !== 'All') params.set('category', category)
       const records = await publicApiRequest(`/schemes?${params}`)
@@ -304,6 +412,7 @@ export function AppProvider({ children }) {
       const profile = { ...(selectedState !== 'All' ? { state: selectedState } : {}), ...(currentUser.occupation ? { occupation: currentUser.occupation } : {}) }
       const reply = schemeAnswer(await publicApiRequest('/schemes/ask', {
         method: 'POST', body: JSON.stringify({ message: userText, profile,
+          history: chatMessages.filter(m => m.sender === 'user').slice(-5).map(m => m.text.slice(0, 1000)),
           ...(category && category !== 'All' ? { category } : {}) }),
       }))
       if (version !== schemeChatVersion.current) return false
@@ -312,7 +421,10 @@ export function AppProvider({ children }) {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
       return true
     } catch (error) {
-      if (version === schemeChatVersion.current) setSchemeChatError(error.message)
+      if (version === schemeChatVersion.current) {
+        setSchemeChatError(error.message)
+        setChatMessages(prev => prev.filter(m => m.id !== `u-${now}`))
+      }
       return false
     } finally {
       if (version === schemeChatVersion.current) { schemeChatBusy.current = false; setIsAiTyping(false) }
@@ -339,9 +451,23 @@ export function AppProvider({ children }) {
       const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) throw error
       clearAccount()
+      setComplaintDraft(EMPTY_DRAFT)
+      draftOwner.current = null
       setAuthError('')
       setComplaintsError('')
     } catch { setAuthError('Sign-out failed. Check your connection and try again.'); addToast('Sign-out failed. Please retry.', 'warning') }
+    finally { setAuthBusy(false) }
+  }
+
+  const signUp = async (email, password) => {
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      if (!supabase) throw new Error(authConfigurationError)
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
+      return { ok: true, confirmationRequired: !data.session }
+    } catch (error) { setAuthError(error.message); return { ok: false } }
     finally { setAuthBusy(false) }
   }
 
@@ -354,11 +480,15 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         currentUser,
-        session, authLoading, authBusy, authError, loginRole, setLoginRole, signIn, signOut,
-        complaintsLoading, complaintsError, refreshComplaints, loadComplaint,
+        session, authLoading, authBusy, authError, loginRole, setLoginRole, signIn, signOut, signUp,
+        complaintDraft, setComplaintDraft, pendingEvidence, uploadEvidence, evidenceMaxBytes,
+        agentMessages, agentDraft, setAgentDraft, agentError, agentTyping, sendAgentMessage,
+        schemeChatDraft, setSchemeChatDraft,
+        complaintsLoading, complaintsError, complaintsTruncated, refreshComplaints, loadComplaint, updateComplaintRouting,
         complaintSaving, complaintSaveError, saveOfficialReference,
         switchUserRole,
         selectedState,
+        eligibilityProfile, setEligibilityProfile,
         setSelectedState,
         schemes, schemesLoading, schemesError, schemeChatError, loadSchemes,
         savedSchemeIds,

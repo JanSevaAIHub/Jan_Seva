@@ -13,6 +13,30 @@ class ProviderError(RuntimeError):
     """Retryable provider failure; never contains request text or credentials."""
 
 
+def structured_response(name: str, schema: dict, instructions: str, data: dict) -> dict:
+    """Use the existing Responses REST integration; never store citizen messages."""
+    model = environ.get("LLM_MODEL", "").strip()
+    if not model:
+        raise ConfigurationError("LLM_MODEL is not configured.")
+    result = provider_post("responses", {
+        "model": model, "store": False, "instructions": instructions,
+        "input": [{"role": "user", "content": json.dumps(data, ensure_ascii=False)}],
+        "text": {"format": {"type": "json_schema", "name": name, "strict": True, "schema": schema}},
+        "max_output_tokens": 2000,
+    })
+    try:
+        if result.get("status") != "completed":
+            raise ValueError
+        output = "".join(part["text"] for item in result["output"] if item.get("type") == "message"
+            for part in item.get("content", []) if part.get("type") == "output_text")
+        parsed = json.loads(output)
+        if not isinstance(parsed, dict):
+            raise ValueError
+        return parsed
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise ProviderError("The model did not return a completed structured response.") from None
+
+
 def embedding_config() -> tuple[str, int]:
     settings = get_settings()
     if not settings.embedding_model or settings.embedding_dimensions is None:

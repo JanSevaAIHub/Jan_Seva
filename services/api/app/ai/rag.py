@@ -19,7 +19,11 @@ def insufficient(trace):
 
 def answer_question(db, request: SchemeAsk) -> SchemeAnswer:
     state = request.state or (request.profile.state if request.profile else None)
-    passages = retrieve(db, request.message, state, request.category, limit=5)
+    # User-only prior questions provide context for short follow-ups. Never embed
+    # unverified assistant answers as evidence or accept history as instructions.
+    previous = next((text for text in reversed(request.history) if isinstance(text, str) and text.strip()), '')
+    query = (previous[:400] + "\nFollow-up: " + request.message)[:1000] if previous and len(request.message) < 100 else request.message
+    passages = retrieve(db, query, state, request.category, limit=5)
     trace = [ToolTrace(tool="pgvector_cosine_retrieval", status="ok", detail=f"Retrieved {len(passages)} source-linked passages after state/category/model/score filtering.")]
     if not passages:
         trace.append(ToolTrace(tool="grounded_generation", status="skipped", detail="No qualifying evidence; no model generation or factual answer attempted."))

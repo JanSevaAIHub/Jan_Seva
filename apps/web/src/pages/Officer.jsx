@@ -37,6 +37,7 @@ export function Officer() {
 
   const [deptFilter, setDeptFilter] = useState('all')
   const [timeFilter, setTimeFilter] = useState('All time')
+  const [showDuplicates, setShowDuplicates] = useState(false)
 
   useEffect(() => { refreshComplaints() }, [])
   const [detailError, setDetailError] = useState('')
@@ -53,6 +54,12 @@ export function Officer() {
     (deptFilter === 'all' || ticket.categoryCode === deptFilter) &&
     Date.now() - new Date(ticket.created_at).getTime() <= days * 86400000) : []
   const countStatus = status => queue.filter(t => t.status === status).length
+  const relatedGroups = new Map()
+  for (const ticket of queue) {
+    const key = `${ticket.categoryCode}:${ticket.locality.trim().toLowerCase()}`
+    relatedGroups.set(key, [...(relatedGroups.get(key) || []), ticket])
+  }
+  const relatedTickets = [...relatedGroups.values()].filter(group => group.length > 1).flat()
   const queueUnavailable = complaintsLoading || Boolean(complaintsError)
   const kpis = {
     totalRequests: queue.length, pendingReview: countStatus('LOCAL_SUBMITTED'),
@@ -315,12 +322,12 @@ export function Officer() {
                 <Sparkles size={18} />
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-300 font-bold">
-                Not available
+                Category + locality
               </span>
             </div>
-            <h3 className="text-sm font-bold tracking-tight">AI Duplicate Detection</h3>
+            <h3 className="text-sm font-bold tracking-tight">Related Ticket Suggestions</h3>
             <p className="text-xs text-violet-200 leading-relaxed">
-              Duplicate detection is not enabled in this phase.
+              {relatedTickets.length} loaded tickets share a category and locality with another assigned ticket. These are suggestions, not confirmed duplicates.
             </p>
           </div>
 
@@ -329,12 +336,14 @@ export function Officer() {
               Review each assigned ticket and its audit history.
             </div>
             <button
-              disabled
+              disabled={!relatedTickets.length}
+              onClick={() => setShowDuplicates(v => !v)}
               className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white text-violet-900 hover:bg-violet-50 text-xs font-bold transition-all shadow-md active:scale-95"
             >
               <span>Review Duplicates</span>
               <ArrowRight size={13} />
             </button>
+            {showDuplicates && relatedTickets.slice(0, 10).map(ticket => <button key={ticket.id} className="block text-left underline text-xs" onClick={() => openTicket(ticket.id)}>{ticket.title}</button>)}
           </div>
         </div>
       </div>
@@ -345,10 +354,10 @@ export function Officer() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Department Routing (AI)
+              Department Routing
             </h3>
             <span className="text-[10px] text-violet-600 font-bold bg-violet-50 px-2 py-0.5 rounded-full">
-              Not enabled
+              Category rules
             </span>
           </div>
 
@@ -358,19 +367,19 @@ export function Officer() {
                 <div>
                   <div className="font-bold text-slate-800">{item.issue}</div>
                   <div className="text-[10px] text-slate-500">
-                    &rarr; {item.targetDept} <span className="text-teal-600 font-bold">({item.confidence}%)</span>
+                    &rarr; {item.targetDept}
                   </div>
                 </div>
                 <button
                   onClick={() => handleRouteAction(item.id, item.targetDept)}
                   className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-semibold transition-all"
                 >
-                  Route
+                  Review routing
                 </button>
               </div>
             ))}
             {routingItems.length === 0 && (
-              <div className="p-4 text-center text-xs text-slate-400">Automated routing is not enabled.</div>
+              <div className="p-4 text-center text-xs text-slate-400">No active assigned tickets to route.</div>
             )}
           </div>
         </div>

@@ -25,6 +25,12 @@ def get_engine() -> Engine:
         url = make_url(configured)
         if url.get_backend_name() != "postgresql":
             raise ConfigurationError("DATABASE_URL must use PostgreSQL; SQLite is used only by isolated tests.")
+        trusted_host = get_settings().supabase_url.split('://')[-1].split('/')[0]
+        project = trusted_host.removesuffix('.supabase.co') if trusted_host.endswith('.supabase.co') else None
+        if project and url.host and (url.host.endswith('.supabase.co') or url.host.endswith('.pooler.supabase.com')):
+            database_project = url.host[3:].removesuffix('.supabase.co') if url.host.startswith('db.') else (url.username or '').removeprefix('postgres.') if (url.username or '').startswith('postgres.') else None
+            if database_project and database_project != project:
+                raise ConfigurationError('DATABASE_URL and SUPABASE_URL refer to different Supabase projects.')
         url = url.set(drivername="postgresql+psycopg")
         if url.host not in ("localhost", "127.0.0.1", "::1") and "sslmode" not in url.query:
             url = url.update_query_dict({"sslmode": "require"})

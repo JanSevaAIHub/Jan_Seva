@@ -18,8 +18,11 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
-
-const SAMPLE_PHOTO_PREVIEW = 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80'
+import { EvidencePicker } from '../components/complaints/EvidencePicker'
+import { EvidenceUploadState } from '../components/complaints/EvidencePanel'
+import { AgentChat } from '../components/common/AgentChat'
+import { apiRequest } from '../lib/api'
+import { CATEGORY_LABELS, DEPARTMENTS, complaintInput } from '../lib/complaints'
 
 export function ComplaintForm() {
   const navigate = useNavigate()
@@ -29,7 +32,7 @@ export function ComplaintForm() {
     complaints,
     setReviewModalComplaint,
     setPackageModalComplaint,
-    addToast
+    addToast, complaintDraft, setComplaintDraft
   } = useApp()
 
   const [activeTab, setActiveTab] = useState('new') // 'new' | 'my-complaints'
@@ -37,12 +40,16 @@ export function ComplaintForm() {
   useEffect(() => { setCreatedTicket(null) }, [session?.user.id])
   
   // Form fields
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('Streetlight & Public Lighting')
-  const [description, setDescription] = useState('')
-  const [locality, setLocality] = useState('')
-  const [priority, setPriority] = useState('Medium')
-  const [hasPhoto, setHasPhoto] = useState(false)
+  const { title, category, description, locality, priority, photo } = complaintDraft
+  const setField = (field, value) => setComplaintDraft(draft => ({ ...draft, [field]: value }))
+  const setTitle = value => setField('title', value)
+  const setCategory = value => setField('category', value)
+  const setDescription = value => setField('description', value)
+  const setLocality = value => setField('locality', value)
+  const setPriority = value => setField('priority', value)
+  const [analysis, setAnalysis] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
   const [aiDetected, setAiDetected] = useState(false)
 
   // Auto-detect category from title typing
@@ -66,8 +73,8 @@ export function ComplaintForm() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!title.trim() || !description.trim()) {
-      addToast('Please enter both title and description', 'warning')
+    if (title.trim().length < 3 || description.trim().length < 10 || locality.trim().length < 2) {
+      addToast('Enter a title (3+ characters), description (10+), and locality (2+).', 'warning')
       return
     }
 
@@ -78,16 +85,15 @@ export function ComplaintForm() {
       description,
       locality,
       priority,
-      department: category === 'Streetlight & Public Lighting' ? 'Urban Infrastructure Dept' :
-                  category === 'Roads & Potholes' ? 'Roads & Transport Dept' :
-                  category === 'Sanitation & Garbage' ? 'Sanitation Dept' : 'Water Supply Dept',
-      evidenceCount: 0,
+      department: DEPARTMENTS[complaintInput({ category }).category],
+      photo, evidenceCount: photo ? 1 : 0,
       onSuccess: (savedTicket) => {
         setCreatedTicket(savedTicket)
         setTitle('')
         setDescription('')
         setLocality('')
-        setHasPhoto(false)
+        setField('photo', null)
+        setAnalysis(null)
         setAiDetected(false)
       }
     })
@@ -96,6 +102,7 @@ export function ComplaintForm() {
   return (
     <div className="space-y-4">
       <ComplaintFeedback />
+      <EvidenceUploadState />
       {/* Breadcrumb & Title */}
       <div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
@@ -346,69 +353,43 @@ export function ComplaintForm() {
           </div>
 
           <p className="text-[11px] text-slate-500">Priority and response-time estimates are not assessed or saved in this phase.</p>
-          {/* Upload Evidence */}
-          <div>
-            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
-              Upload Evidence
-            </label>
-            <div className="flex items-center gap-3">
-              {hasPhoto ? (
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group">
-                  <img
-                    src={SAMPLE_PHOTO_PREVIEW}
-                    alt="Evidence preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHasPhoto(false)
-                      addToast('Sample preview hidden. No attachment was uploaded.', 'info')
-                    }}
-                    className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHasPhoto(true)
-                    addToast('Sample preview only; attachments are not uploaded in this phase.', 'info')
-                  }}
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 hover:border-violet-400 flex flex-col items-center justify-center text-slate-400 hover:text-violet-600 transition-colors"
-                >
-                  <Upload size={18} />
-                  <span className="text-[9px] font-bold mt-1">Preview</span>
-                </button>
-              )}
-
-              <div className="text-xs text-slate-500 leading-relaxed">
-                <div>Sample preview only; attachments are not saved.</div>
-                <div className="text-[11px] text-slate-400">Location is stored as the locality text you enter.</div>
-              </div>
-            </div>
-          </div>
-
+          <EvidencePicker file={photo} onChange={value => setField('photo', value)} />
+          {analysisError && <p role="alert" className="text-xs text-rose-700">{analysisError} Your draft is kept.</p>}
+          {analysis && <div className="p-3 bg-violet-50 rounded-xl space-y-2 text-xs">
+            <p className="font-bold">AI suggestion (editable): {CATEGORY_LABELS[analysis.category]} ? {analysis.department}</p>
+            <p className="whitespace-pre-wrap">{analysis.draft}</p><p>{analysis.next_action}</p><p>{analysis.notice}</p>
+            <button type="button" onClick={() => { setCategory(CATEGORY_LABELS[analysis.category] || 'Other'); setDescription(analysis.draft); setAiDetected(false) }} className="text-violet-700 underline">Use suggested category and draft</button>
+            <p>{analysis.similarity_note}</p>
+            {analysis.similar_complaints?.map(ticket => <Link key={ticket.id} className="block underline text-violet-700" to={`/track?id=${ticket.id}`}>{ticket.title} ? {ticket.status}</Link>)}
+          </div>}
           {/* Similar Complaints (AI Suggestion Alert) */}
           <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-2.5">
             <Sparkles size={16} className="text-indigo-600 flex-none mt-0.5" />
             <div className="text-xs text-indigo-950 leading-relaxed">
-              <strong>Similar Complaints:</strong> Duplicate detection is not enabled in this phase.
+              <strong>Similar Complaints:</strong> Analyze your draft to check your recent tickets for possible duplicates in the same locality.
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-500">Draft storage is unavailable. Your values stay in this form for review or retry; refreshing clears unsaved values.</p>
+          <p className="text-[11px] text-slate-500">Your draft stays available when switching pages during this session. Refreshing clears unsaved values.</p>
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             <button
               type="button"
-              disabled
-              title="Draft storage is unavailable; form values remain while you review or retry."
+              disabled={analyzing || !session || title.trim().length < 3 || description.trim().length < 10 || locality.trim().length < 2}
+              onClick={async () => {
+                if (analyzing) return
+                setAnalyzing(true); setAnalysisError('')
+                try {
+                  const advice = await apiRequest('/complaints/analyze', session?.access_token, { method: 'POST', body: { title, description, locality } })
+                  if (!CATEGORY_LABELS[advice.category] || typeof advice.draft !== 'string') throw new Error('The AI returned invalid advice. Please retry.')
+                  setAnalysis(advice)
+                } catch (error) { setAnalysisError(error.message) }
+                finally { setAnalyzing(false) }
+              }}
+              title={!session ? 'Sign in to analyze; you can submit a draft without AI.' : 'Get editable suggestions without submitting your complaint.'}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50"
             >
-              Save as Draft
+              {analyzing ? 'Analyzing…' : 'Analyze with AI'}
             </button>
             <button
               type="submit"
@@ -421,6 +402,7 @@ export function ComplaintForm() {
 
         {/* Right: Live Complaint Tracker (Track Your Complaints) */}
         <div className="lg:col-span-5 space-y-4">
+          <AgentChat compact />
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div>

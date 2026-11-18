@@ -1,7 +1,7 @@
 Scheme: Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY)
 State: National
 Category: Insurance
-Source URL: https://www.financialservices.gov.in/pmjjby
+Source URL: https://financialservices.gov.in/pmjjby
 Reviewed: 2026-11-07
 Evidence type: reviewed paraphrase of the linked official source, not a verbatim quotation.
 

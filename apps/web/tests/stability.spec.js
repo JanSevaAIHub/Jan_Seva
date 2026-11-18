@@ -10,7 +10,7 @@ test('Home navigation is honest and scheme listing comes from the actual isolate
   page.on('request', r => { if (r.url().endsWith('/api/schemes/ask')) chatRequests++ })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Citizen Services Assistant/ })).toBeVisible()
-  await expect(page.getByText('General-purpose chat and voice are not available here;', { exact: false })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Citizen AI Assistant' })).toBeVisible()
   await expect(page.getByText('12.8 L+', { exact: true })).toHaveCount(0)
   await expect(page.getByText('96%', { exact: true })).toHaveCount(0)
   await expect(page.locator('main').getByRole('link', { name: /^Raise Complaint/ })).toHaveAttribute('href', '/complaints/new')

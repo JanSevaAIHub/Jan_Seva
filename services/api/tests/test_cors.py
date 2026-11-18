@@ -16,7 +16,7 @@ def test_only_configured_local_origins_receive_cors_permission(origin, expected)
     with TestClient(app) as client:
         response = client.options("/api/complaints", headers={
             "Origin": origin, "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "authorization,content-type",
+            "Access-Control-Request-Headers": "authorization,content-type,idempotency-key,x-filename",
         })
     assert response.status_code == expected
     if expected == 200:
