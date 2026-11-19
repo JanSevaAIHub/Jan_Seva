@@ -54,10 +54,86 @@ def validate_vector(vector, dimensions: int) -> list[float]:
     return vector
 
 
+def clean_gemini_schema(schema: dict) -> dict:
+    if not isinstance(schema, dict):
+        return schema
+    res = {}
+    for k, v in schema.items():
+        if k in ("additionalProperties", "maxItems", "minItems", "strict", "name"):
+            continue
+        if isinstance(v, dict):
+            res[k] = clean_gemini_schema(v)
+        elif isinstance(v, list):
+            res[k] = [clean_gemini_schema(i) if isinstance(i, dict) else i for i in v]
+        else:
+            res[k] = v
+    return res
+
+
+def gemini_post(key: str, endpoint: str, payload: dict) -> dict:
+    try:
+        with httpx.Client(timeout=httpx.Timeout(45, connect=5), follow_redirects=False) as client:
+            if endpoint == "responses":
+                model = payload.get("model", "gemini-3.5-flash-lite").removeprefix("models/")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                contents = []
+                for item in payload.get("input", []):
+                    contents.append({"role": "user", "parts": [{"text": item.get("content", "")}]})
+                gen_config = {
+                    "response_mime_type": "application/json",
+                    "maxOutputTokens": payload.get("max_output_tokens", 2000),
+                }
+                raw_schema = payload.get("text", {}).get("format", {}).get("schema")
+                if raw_schema:
+                    gen_config["response_schema"] = clean_gemini_schema(raw_schema)
+                body = {
+                    "contents": contents,
+                    "generationConfig": gen_config,
+                }
+                if payload.get("instructions"):
+                    body["systemInstruction"] = {"parts": [{"text": payload["instructions"]}]}
+                resp = client.post(url, json=body)
+                resp.raise_for_status()
+                data = resp.json()
+                text_part = data["candidates"][0]["content"]["parts"][0]["text"]
+                return {
+                    "status": "completed",
+                    "output": [{"type": "message", "content": [{"type": "output_text", "text": text_part}]}],
+                }
+            elif endpoint == "embeddings":
+                raw_model = payload.get("model", "gemini-embedding-001")
+                model = raw_model.removeprefix("models/")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents?key={key}"
+                dims = payload.get("dimensions")
+                reqs = []
+                for text in payload.get("input", []):
+                    req = {"model": f"models/{model}", "content": {"parts": [{"text": text}]}}
+                    if dims:
+                        req["outputDimensionality"] = dims
+                    reqs.append(req)
+                resp = client.post(url, json={"requests": reqs})
+                resp.raise_for_status()
+                data = resp.json()
+                items = data.get("embeddings", [])
+                return {
+                    "model": raw_model,
+                    "data": [{"index": i, "embedding": item["values"]} for i, item in enumerate(items)],
+                }
+            else:
+                raise ValueError(f"Unsupported endpoint: {endpoint}")
+    except (httpx.HTTPError, KeyError, IndexError, ValueError):
+        raise ProviderError("The model provider is temporarily unavailable or returned an invalid response.") from None
+
+
 def provider_post(endpoint: str, payload: dict) -> dict:
     key = environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise ConfigurationError("OPENAI_API_KEY is required for the configured OpenAI provider.")
+    model = payload.get("model", "")
+    if (key.startswith("AQ.") or key.startswith("AIzaSy") or "gemini" in model) and not (
+        model.startswith("text-embedding-3") or model.startswith("gpt-")
+    ):
+        return gemini_post(key, endpoint, payload)
     try:
         with httpx.Client(timeout=httpx.Timeout(45, connect=5), follow_redirects=False) as client:
             response = client.post("https://api.openai.com/v1/" + endpoint,
@@ -76,7 +152,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts or len(texts) > 64 or any(not text.strip() or len(text) > 6000 for text in texts):
         raise ValueError("Embedding input must contain 1–64 nonempty evidence chunks of at most 6000 characters.")
     payload = {"model": model, "input": texts, "encoding_format": "float"}
-    if model.startswith("text-embedding-3"):
+    if model.startswith("text-embedding-3") or "gemini" in model:
         payload["dimensions"] = dimensions
     result = provider_post("embeddings", payload)
     try:
