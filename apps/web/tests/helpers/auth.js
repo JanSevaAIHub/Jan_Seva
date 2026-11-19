@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test'
 
 export async function login(page, role) {
-  await page.locator('header').getByRole('button', { name: /Guest|Arjun Mishra|R. Singh/ }).click()
+  await page.locator('header').getByRole('button', { name: /Guest|Citizen|Arjun Mishra|R. Singh/ }).click()
   await page.getByRole('button', { name: role === 'officer' ? 'Officer Sign In' : 'Citizen Sign In', exact: true }).last().click()
   const modal = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /Sign in/ }) })
   await modal.getByLabel('Email').fill(role === 'officer' ? 'singh@example.test' : 'arjun@example.test')

@@ -16,7 +16,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.config import ConfigurationError, get_settings
 from app.db import get_engine
 from app.scripts.migrate import validate_schema
-from app.storage import EvidenceStorage, StorageError
+from app.evidence_storage import get_storage, storage_access_guard
+from fastapi import HTTPException
 
 EXPECTED_PROJECT = 'https://rmexxrdtqszlnsndcrpj.supabase.co'
 ROOT = Path(__file__).resolve().parents[4]
@@ -50,18 +51,18 @@ def verify():
                 result['select_1'] = connection.scalar(text('SELECT 1')) == 1
                 validate_schema(connection)
                 result['schema'] = 'verified'
-                rows = connection.execute(text("SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('profiles','complaints','complaint_events','schemes','scheme_chunks','complaint_evidence','complaint_submissions')")).all()
+                rows = connection.execute(text("SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('profiles','complaints','complaint_events','schemes','scheme_chunks','complaint_evidence')")).all()
                 result['rls'] = {name: enabled for name, enabled in rows}
-                result['storage_api_only_policy'] = bool(connection.scalar(text("SELECT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects' AND policyname='janseva_evidence_api_only' AND permissive='RESTRICTIVE')")))
+                result['storage_api_only_policy'] = bool(connection.scalar(text("SELECT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects' AND policyname='janseva_evidence_server_only' AND permissive='RESTRICTIVE')")))
         except (SQLAlchemyError, ConfigurationError):
             result['database'] = 'failed_connectivity_or_schema_review_required'
     else:
         result['database'] = 'blocked_missing_DATABASE_URL_or_project_mismatch'
     if settings.supabase_service_role_key and result['project_match']:
         try:
-            EvidenceStorage().require_private()
+            get_storage().private_bucket()
             result['storage_bucket'] = 'verified_private'
-        except (ConfigurationError, StorageError):
+        except (ConfigurationError, HTTPException):
             result['storage_bucket'] = 'failed_or_unavailable'
     else:
         result['storage_bucket'] = 'blocked_missing_SUPABASE_SERVICE_ROLE_KEY_or_project_mismatch'

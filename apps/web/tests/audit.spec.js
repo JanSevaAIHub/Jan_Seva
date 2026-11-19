@@ -126,6 +126,8 @@ test('sign-in dialog contains keyboard focus, closes on Escape and restores focu
   await expect.poll(() => modal.evaluate(node => node.contains(document.activeElement))).toBe(true)
   await modal.getByRole('button', { name: 'Sign in', exact: true }).focus()
   await page.keyboard.press('Tab')
+  await expect(modal.getByRole('button', { name: 'Forgot password?', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(modal.getByRole('button', { name: 'Close sign in' })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(modal).toHaveCount(0)

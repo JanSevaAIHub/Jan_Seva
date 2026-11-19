@@ -1,0 +1,40 @@
+# Preparation only. No database provisioning or automatic migration/ingestion.
+services:
+  - type: web
+    name: janseva-api
+    runtime: python
+    region: singapore
+    plan: free
+    branch: master
+    rootDir: services/api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: EMBEDDING_MODEL
+        sync: false
+      - key: EMBEDDING_DIMENSIONS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: RAG_MIN_SCORE
+        value: "0.35"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: EVIDENCE_UPLOAD_ENABLED
+        value: "false"
+      - key: SUPABASE_EVIDENCE_BUCKET
+        sync: false
+      - key: DEMO_ASSIGNMENT_ENABLED
+        value: "false"
+      - key: DEMO_DEFAULT_OFFICER_USER_ID
+        sync: false

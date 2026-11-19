@@ -25,18 +25,18 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Filename"],
 )
 
 app.include_router(health_router, prefix="/api")
 app.include_router(profiles_router, prefix="/api")
-app.include_router(evidence_router, prefix="/api")
 app.include_router(complaints_router, prefix="/api")
 app.include_router(officer_router, prefix="/api")
 app.include_router(schemes_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(conversation_router, prefix="/api")
+app.include_router(evidence_router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)

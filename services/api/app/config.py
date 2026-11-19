@@ -25,6 +25,8 @@ class Settings:
     embedding_dimensions: int | None
     demo_citizen_user_id: str = ""
     demo_officer_user_id: str = ""
+    demo_default_officer_user_id: str = ""
+    demo_assignment_enabled: bool = False
 
     @property
     def auth_issuer(self) -> str:
@@ -61,6 +63,8 @@ def get_settings() -> Settings:
         embedding_dimensions=dimensions,
         demo_citizen_user_id=environ.get("DEMO_CITIZEN_USER_ID", "").strip(),
         demo_officer_user_id=environ.get("DEMO_OFFICER_USER_ID", "").strip(),
+        demo_default_officer_user_id=environ.get("DEMO_DEFAULT_OFFICER_USER_ID", "").strip(),
+        demo_assignment_enabled=environ.get("DEMO_ASSIGNMENT_ENABLED", "").lower() == 'true',
     )
 
 

@@ -1,46 +1,175 @@
-# JanSeva API contract
+# API contract — Day 1 shared boundary
 
-Updated 2026-11-19. Base path: `/api`. JSON responses and JSON request bodies except the binary evidence upload. Errors use `{detail: {code, message}}`. Protected requests carry a verified Supabase user JWT in `Authorization: Bearer ...`. Roles come from database profiles.
+Base path: `/api`. JSON requests and responses, except the image upload/content endpoints documented below. Protected calls send `Authorization: Bearer <Supabase access token>`. Backend verifies token signature/claims and resolves role server-side; never trust a role sent by the client.
 
-| Method / route | Request and behavior |
-|---|---|
-| `GET /health` | Process health only: `{status: "ok"}` |
-| `GET /me` | Authenticated server-owned `{user_id, name, role, state, occupation}` |
-| `GET /schemes` | Optional `query` (3-1000 chars), `state`, `category`, `limit` (1-50), `search_mode=semantic|keyword`. Default semantic; UI explicitly requests keyword search, which needs no model. Returns stored `SchemeCard[]`; state includes national records. |
-| `POST /schemes/ask` | `{message, profile?: {state?, occupation?}, state?, category?, history?: string[]}`. At most five prior user questions, each 1-1000 chars. Returns `{answer, citations, tool_trace, mode}`. |
-| `POST /schemes/screen` | `{scheme_id: UUID, profile: EligibilityProfile}`. Returns `{scheme_id, title, status, reasons, missing_fields, notice, source_url, reviewed_at}`. No LLM. |
-| `POST /agent/conversation` | `{message, profile?: {state?, occupation?}, history?: [{role: "user"|"assistant", content}]}`. Max ten turns, each 1-5000 chars. Returns `{intent, answer, citations, tool_trace, mode, complaint}`. No writes. |
-| `POST /agent/message` | LangGraph navigator: `{message, session_id?, profile?, scheme_id?, complaint?}` -> `{session_id, intent, response, status, citations, actions, tool_trace, eligibility}`. Intent uses `clarify`; action paths are allowlisted and complaint actions require review. |
-| `POST /schemes/eligibility` | Stored evidence-backed rules: `{scheme_id, profile}` -> `{scheme_id, status, matched_rules, missing_fields, reasons, citations}`. Profile supports exact values/ranges, income periods and source-backed conditions. |
-| `POST /complaints/analyze` | Citizen only: `{title, description, locality}`. Returns `{category, draft, department, next_action, mode, notice, similar_complaints, similarity_note}`. Similarity considers only the caller's latest 100 tickets. |
-| `POST /complaints` | Citizen explicitly confirms `{title, description, category, locality}`. Optional UUID `Idempotency-Key` header. Returns 201 `ComplaintDetail`; same owner/key/payload replays the same ticket, changed payload returns 409. |
-| `GET /complaints` | Owner/assigned-officer scope. Optional `status`, `limit` (1-100, default 100), `offset` (0-100000). Returns `ComplaintDetail[]`. UI bounds loaded history at 1,000 and labels that limit. |
-| `GET /complaints/{id}` | Authorized `ComplaintDetail` including persistent events |
-| `PATCH /officer/complaints/{id}` | Assigned officer: `{status, note?}`. Exactly one next status; atomic compare-and-set plus event. |
-| `PATCH /officer/complaints/{id}/routing` | Assigned officer: `{category}`. Persists internal category/recommended department and same-status event; no external referral. Identical category is a no-op. |
-| `PATCH /complaints/{id}/official-ref` | Citizen owner: `{official_ref}`. Records an unverified filing reference; internal status unchanged. |
-| `GET /complaints/evidence-config` | Public `{max_bytes, mime_types}` |
-| `POST /complaints/{id}/evidence` | Citizen owner: raw image bytes, image `Content-Type`, percent-encoded `X-Filename`. Returns 201 `{id, filename, mime_type, size_bytes, created_at}`. One photo per ticket; a replacement uses a fresh object, commits new metadata, then cleans up the old object. |
-| `GET /complaints/{id}/evidence` | Owner/assigned officer: metadata array, empty when absent; no object paths or URLs |
-| `GET /complaints/{id}/evidence/{evidence_id}/access` | Owner/assigned officer: `{url, expires_in: 300}`. `Cache-Control: private, no-store`; private-bucket check before signing. |
+## 2026-11-14 additive release contracts
 
-## Validation and security
+Requires reviewed migration 005; no migration is executed on startup.
 
+- `PATCH /me`: authenticated `{name, state?, occupation?}` only; `name` 1–120 characters, optional fields 2–100 characters or null. No role/user-ID updates. Signup carries only permitted display metadata through Supabase email confirmation; the client persists it through this authenticated route after `/me` provisions the citizen. Profile-save failures are shown with retry, not reported as successful persistence.
+- `POST /complaints`: unchanged JSON schema; optional UUID `Idempotency-Key` header. Same user/key/body returns the already saved ticket with one initial event; changed body returns 409. Keys are scoped per citizen. Clients without a key retain distinct-create behavior. The browser keeps its attempt key while retrying the same draft, including an ambiguous network failure.
+- `GET /evidence/config`: public capability/size/count/type metadata only. Uploads disabled by default; no bucket creation or credentials returned.
+- `GET /complaints/{id}/evidence`: authenticated owner or assigned officer; array `{id, complaint_id, state, content_type, size_bytes, created_at}`. Includes pending operations honestly; never exposes object paths or storage credentials.
+- `POST /complaints/{id}/evidence`: citizen owner only. **Raw file bytes**, `Content-Type: image/jpeg|image/png|image/webp`, required UUID `Idempotency-Key`. Maximum 5 MiB and three pending/ready attachments. Actual file decoding, format/MIME agreement, single-frame and pixel limits are enforced; pixels are re-encoded to remove EXIF/GPS and trailing payloads. Returns 201 evidence metadata.
+- `GET /complaints/{id}/evidence/{evidenceId}/content`: owner/assigned officer; authenticated raster bytes, `Cache-Control: private, no-store`, `nosniff`. Every read re-verifies JWT/ownership/assignment. **No public or signed image URLs** are issued; the frontend uses revocable in-memory blob URLs after authenticated fetch. Expired bearer tokens return 401.
+- `DELETE /complaints/{id}/evidence/{evidenceId}`: citizen owner only, 204. Officers cannot upload/delete. Delete is retryable; object removal precedes metadata removal. A failed delete remains `DELETE_PENDING` and is not viewable.
+
+`PENDING` is committed before remote uploads. A timeout or database failure after a storage write leaves a tracked path for retry/removal, not a falsely ready record. Upload retries with the same key/content reuse that record; different content is 409. Count reservations use a complaint lock and database slot uniqueness. Storage and PostgreSQL cannot commit atomically; incomplete operations deliberately remain visible until reconciled. See [setup and recovery](private-evidence-and-release-setup.md).
+
+Registered routes include `GET /health`, `GET /me`, `POST /complaints`, `GET /complaints`, `GET /complaints/{id}`, `PATCH /officer/complaints/{id}` and `PATCH /complaints/{id}/official-ref`. Scheme routes are public `GET /schemes`, `POST /schemes/ask` and `POST /schemes/eligibility`. Phase 3 adds `POST /agent/message`. Complaint analysis uses the shared read-only deterministic service described in the 2026-11-10 update below. `/me` returns `{user_id, name, role, state, occupation}` from the server-controlled profile. Resource/user IDs are UUIDs. No random frontend ticket ID is generated.
+
+`ComplaintCreate` accepts only `{title, description, category, locality}`. A citizen's verified identity supplies ownership; the create response is 201 with `ComplaintDetail`. List returns `ComplaintDetail[]` including events for the existing list timelines, scoped to citizen ownership or officer assignment; `?status=` optionally filters. Officer PATCH accepts `{status, note?}` and advances exactly one step: `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Invalid transitions return 409. Update and audit event commit atomically. Notes may be omitted, in which case the server records a default note.
+
+The owner-only reference route accepts `{official_ref}` and returns `ComplaintDetail` with the unverified user-reported reference. `official_status` is `NOT_FILED` until the citizen supplies a reference, then `USER_REPORTED_FILED`. Internal status never implies government filing/resolution. See [Phase 2 setup](phase-2-setup.md) for assignment configuration, tests and live verification limits.
+
+## Routes
+
+| Method | Route | Request | Response |
+|---|---|---|---|
+| GET | `/health` | none | `{ "status": "ok" }` |
+| GET | `/me` | authenticated | `Profile` |
+| GET | `/schemes?query=&state=&category=&limit=` | optional filters | database `SchemeCard[]`; vector query when provided |
+| POST | `/schemes/ask` | `{ "message": string, "profile"?: {state?, occupation?}, "state"?: string, "category"?: string }` | `{ "answer": string, "citations": SchemeCitation[], "tool_trace": ToolTrace[], "mode": string }` |
+| POST | `/schemes/eligibility` | `{ "scheme_id": UUID, "profile": EligibilityProfile }` | `{ "scheme_id": UUID, "status": EligibilityStatus, "matched_rules": string[], "missing_fields": string[], "reasons": string[], "citations": EligibilityCitation[] }` |
+| POST | `/complaints/analyze` | verified citizen; `{ "title"?: string, "description": string, "locality"?: string }` | Read-only deterministic keyword suggestion, unchanged description, suggested authority and owner-only related complaints |
+| POST | `/complaints` | confirmed `ComplaintCreate` | 201 `ComplaintDetail` with `LOCAL_SUBMITTED` internal status |
+| GET | `/complaints?status=&category=&locality=` | authenticated + ownership scope | `ComplaintDetail[]` |
+| GET | `/complaints/{id}` | authenticated + owner/officer check | `ComplaintDetail` including internal events |
+| GET | `/officer/complaints?status=&category=&locality=` | authenticated officer only | filtered department/assigned `ComplaintDetail[]` |
+| PATCH | `/officer/complaints/{id}` | assigned officer only: `{ "status": InternalStatus, "note"?: string }` | updated `ComplaintDetail`; append audit event |
+| PATCH | `/complaints/{id}/official-ref` | citizen owner: `{ "official_ref": string, "official_channel"?: string|null, "official_submitted_on"?: date|null }` | `ComplaintDetail`; internal status unchanged |
+| POST | `/agent/message` | `{ "message": string, "session_id"?: UUID, "profile"?: EligibilityProfile, "scheme_id"?: UUID, "complaint"?: ComplaintDraft }` | `{ "session_id": UUID, "intent": "scheme"|"complaint"|"mixed"|"clarify", "response": string, "status": AgentStatus, "citations": Citation[], "actions": AgentAction[], "tool_trace": ToolTrace[], "eligibility": EligibilityResult[] }` |
+
+## Phase 3 implemented scheme boundary
+
+- `GET /schemes?query=&state=&category=&limit=` returns actual stored `SchemeCard[]`. Without `query`, listing needs only the database. With a query, exact pgvector cosine retrieval uses the configured OpenAI embedding model. A selected state includes national schemes; category is an exact case-insensitive filter. Limit is 1-50 for listing and query retrieval considers at most five passages before scheme deduplication.
+- `POST /schemes/ask` accepts `{message, profile?: {state?, occupation?}, state?, category?}`. It returns `{answer, citations, tool_trace, mode}`. `mode` is `grounded_extracts`, `extractive_fallback` or `insufficient_evidence`.
+- Citations contain `{scheme_id, chunk_id, title, url, excerpt, reviewed_at, evidence_kind}` from retrieved source records. Evidence is a reviewed paraphrase, not a verbatim source quote. Unsupported model text/URLs and partial-paragraph selections are removed before display.
+- Missing embedding model/dimension configuration or invalid vector schema returns sanitized retryable 503. A provider outage or missing API key can use labelled lexical retrieval over actual stored chunks. Empty/insufficient evidence returns uncertainty with no citations. LLM failure is explicitly labeled if related extracts are returned. No fabricated scheme/vector fallback or eligibility guarantee exists.
+- See [Phase 3 setup](phase-3-setup.md) for additive migration 002, ingestion, source review, tests and live blockers. `SchemeCard` includes the stored fields plus curated eligibility, document records and evidence/limitations for the retained UI; no invented match score is returned.
+
+## Shared types
+
+- `EligibilityStatus`: `POTENTIAL | NOT_MATCHED | NEEDS_INFO`.
 - `ComplaintCategory`: `road | water | sanitation | streetlight | other`.
-- New complaint: title 3-250 chars, description 10-5000, locality 2-250. Extra fields forbidden. Ownership, status, role and assignment are never citizen inputs.
-- Status progression: `LOCAL_SUBMITTED -> UNDER_REVIEW -> IN_PROGRESS -> RESOLVED`. Invalid progression: 409. Old stored statuses remain readable.
-- Government filing: `NOT_FILED` or `USER_REPORTED_FILED`; never infer official registration or resolution from an internal action.
-- Eligibility: `POTENTIAL | NOT_MATCHED | NEEDS_INFO`. Optional profile fields: state, age, annual_income, bank_account, auto_debit_consent, income_tax_payer, landholding_farmer, government_employee_family, indian_citizen, girl_child, punjab_domicile, covered_social_category, notified_artisan_trade, recent_similar_credit, school_type, class_level, selected_state_exam, class_vii_marks, sc_st. Unknown facts stay null. Screening covers limited curated conditions, not a guarantee.
-- Agent intents: `scheme | complaint | mixed | unknown`. Unknown intent returns deterministic clarification. Mixed intent preserves a successful tool result and reports an unavailable part. Complaint responses are labelled editable suggestions; there is no submission tool.
-- Scheme answer modes: `grounded_extracts | extractive_fallback | insufficient_evidence`. Agent additionally uses `ai_suggestion | clarification`. A fallback is explicitly labelled and never invents an embedding. Citations must match complete stored paragraphs, known chunks and official URLs.
-- Shared model budget: 10 requests/client/minute, 30 total/minute, two concurrent per process. Keyword listing and deterministic eligibility do not use the model budget. Excess work: 429 and `Retry-After`.
-- Images: JPEG, PNG, WebP; default 5 MB (`EVIDENCE_MAX_BYTES`), max 20 megapixels, still images only. Server decodes/re-encodes, clears metadata and checks actual MIME. Invalid image: 422, excessive bytes: 413. Storage/provider configuration failures: sanitized 503. Failed photo upload retains the complaint and allows a photo-only retry.
-- Missing/invalid JWT: 401. Wrong role: 403. Unauthorized private resource: non-disclosing 404. Metadata/signing responses are not cacheable. Signed links remain bearer capabilities until expiry.
-- Browser CORS accepts only configured origins and supports `Authorization`, `Content-Type`, `Idempotency-Key`, `X-Filename`.
+- Phase 2 writable `InternalStatus`: `LOCAL_SUBMITTED | UNDER_REVIEW | IN_PROGRESS | RESOLVED`. Storage retains older Phase 1 enum values for existing data; the new workflow cannot transition into them.
+- `OfficialFilingStatus`: `NOT_FILED | USER_REPORTED_FILED`. Never derive this from an internal status or portal link click.
+- `ProfileInput`: optional `state`, `occupation`, `age_range`, and income band only as needed; no Aadhaar or identity documents.
+- `Citation`: `{ "title": string, "url": string, "excerpt"?: string, "reviewed_at"?: string }`. A scheme claim must have a verified official URL.
+- `ToolTrace`: `{ "tool": string, "status": "ok"|"skipped"|"error" }`; no raw prompts, credentials, or PII.
 
-The SQL migration is reviewed code, not evidence of a hosted schema. Apply only to an explicitly verified development project with approval and backup/recovery arrangements. See [final release verification](FINAL-JANSEVA-BUG-FIX-REPORT.md).
+## Errors and validation
+
+Errors are `{ "detail": { "code": string, "message": string } }`. Pydantic validation: 422; missing/invalid token: 401; forbidden resource: 403 or non-disclosing 404. AI failures return a retryable error without deleting a local complaint draft. All external filing requires a separate user action; the agent cannot create a complaint directly.
 
 
-## Main-branch integration
+## Deterministic eligibility endpoint (2026-11-09)
 
-The richer homepage LangGraph navigator keeps the Developer A `/agent/message` request/response contract (session UUID, structured profile, scheme selection, explicit draft proposal, `response`, `actions`, `eligibility` and `tool_trace`). The focused citizen composer contract documented above is available at `/agent/conversation`. Stored evidence-backed rules use `/schemes/eligibility`; the eight-record limited quick-check contract above is preserved at `/schemes/screen`. See [Developer A API details](developer-a-phase-2-ui.md) and [agent handoff](dev-a-day1-handoff.md). No mutation tool is added.
+`POST /api/schemes/eligibility` is public and read-only, like stored scheme listing. It requires a real stored scheme UUID, not a slug or synthetic `S001` ID. It performs a database lookup through `get_db`, never reads the CSV as an API fallback, calls no model/provider and stores no submitted profile. Existing GET and ask payloads are unchanged.
+
+```json
+{
+  "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+  "profile": {
+    "age": 22,
+    "participating_account": true,
+    "auto_debit_consent": true
+  }
+}
+```
+
+For this stored PMSBY record with current structured rules, the response is:
+
+```json
+{
+  "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+  "status": "POTENTIAL",
+  "matched_rules": ["Age must be at least 18", "Age must be at most 70", "Participating bank or post-office account: Yes", "Auto-debit consent: Yes"],
+  "missing_fields": [],
+  "reasons": ["Assessment covers reviewed conditions only; official eligibility is not guaranteed. Confirm current terms with the administering authority."],
+  "citations": [{
+    "scheme_id": "2fa9a24a-4d17-5639-9e11-8d5624196722",
+    "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+    "url": "https://financialservices.gov.in/pmsby",
+    "reviewed_at": "2026-11-07T00:00:00+05:30",
+    "excerpt": "Individual account holders aged 18 to 70 at participating banks or post offices may join through one account. Enrolment requires consent to premium auto-debit. Scheme terms determine covered losses; account ownership and age alone do not confirm that insurance is active.",
+    "evidence_kind": "reviewed_paraphrase"
+  }]
+}
+```
+
+`EligibilityProfile` accepts optional `age` (strict integer 0-150), `state`, `occupation` (2-100 characters), nonnegative finite numeric `annual_income` and `monthly_income` (INR, distinct periods, no implicit conversion), `disability_percent` (0-100), and strict booleans `bpl_household`, `widow`, `unorganised_worker`, `epf_esic_nps`, `income_taxpayer`, `other_government_pension`, `participating_account`, `auto_debit_consent`. Null means unknown; omitted values are never assumed true or false. Unexpected fields, numeric strings, boolean strings and invalid numbers return 422. Do not send Aadhaar numbers, documents or account identifiers.
+
+Version 1 stored rules use `gte`, `lte`, case-insensitive `eq`, `present` and `coverage`. Every condition contains a supporting passage from the stored reviewed source note. A `present` rule only collects information; it cannot establish a notified occupation. `coverage` gates assessment to the reviewed source's region; absent/unknown state or a different state returns `NEEDS_INFO` before regional exclusions are evaluated. This does not fabricate a national residency restriction.
+
+Statuses are exactly `POTENTIAL`, `NOT_MATCHED`, `NEEDS_INFO`. Within applicable source coverage, a confirmed failed condition takes precedence over missing information. All conditions must be satisfied and no unmodeled conditions remain for `POTENTIAL`; this is not guaranteed official eligibility, active insurance or approval. Missing/ambiguous fields are listed in `missing_fields`. Unmodeled conditions and invalid/legacy rules are explained in `reasons`; do not treat an empty missing-fields list as approval. Missing or unsafe provenance yields `NEEDS_INFO` without unsafe citations. Eligibility citations reference the scheme source, so they have no fabricated chunk ID.
+
+An absent stored UUID returns 404 `SCHEME_NOT_FOUND`; invalid payload/UUID returns 422 `VALIDATION_ERROR`. Missing database configuration returns 503 `DATABASE_NOT_CONFIGURED`; database errors use the existing sanitized 503 `DATABASE_UNAVAILABLE`. Older stored records with prose-only JSON return `NEEDS_INFO` until an operator safely reingests the versioned corpus. No migration or automatic ingestion runs on requests.
+
+### Ranges and Scheme Navigator integration
+
+Optional `age_range`, `monthly_income_range` and `annual_income_range` accept `{min, max}` with inclusive bounds and `min <= max`. Age bounds are strict integers 0-150; income bounds are finite nonnegative numbers in INR for the named period. Supply an exact value or its range, never both (422). Null/omitted values remain unknown. No monthly/annual conversion or midpoint guessing is performed.
+
+The whole range must satisfy a condition to match it. A wholly contradictory range yields `NOT_MATCHED`; a range crossing a boundary yields `NEEDS_INFO` and requests more precise information in the canonical field, such as `age`. Applicable confirmed contradictions take precedence over missing/ambiguous fields. Regional coverage gates and unresolved source conditions remain unchanged. `matched_rules` are readable strings; consumers must not parse them as rule code. Each eligibility citation contains an exact supporting stored passage, so distinct passages may produce separate citations for the same scheme.
+
+The existing Scheme Discovery UI uses the shared authenticated JSON client when signed in and the same transport's public wrapper for guest browsing. Profile edits exist only in provider memory for the current tab, survive in-app navigation, and clear on reload/account change. There is no writable `/me` profile contract and no claim of Supabase profile persistence. Editing a profile invalidates prior/pending assessments. A `POTENTIAL` result remains a provisional match to reviewed conditions, never approval.
+
+Cards/details expose actual metadata, supported document records, official/application links and review dates. The source-evidence drawer shows validated API excerpts and their associated scheme. Unsafe, changed or mismatched eligibility citations cause an error rather than a displayed assessment. Search invalidation begins when filters/query change, including the debounce period. Chat errors retain the typed question for retry.
+
+See [Phase 2 report](developer-a-phase-2-ui.md) and [captured eligibility responses](phase-2-eligibility-examples.json) for local integration evidence and live limitations.
+
+## Scheme RAG foundation update (2026-11-09)
+
+Both scheme endpoints retain their existing JSON contracts. Citations already contain scheme IDs/titles and supporting evidence in `excerpt`; no duplicate references/evidence payload is added.
+
+- `GET /schemes` supports optional query, state, category and a bounded 1-50 list limit. Query retrieval considers up to five chunks before scheme deduplication. `X-Scheme-Retrieval` reports `stored_records`, `pgvector_cosine_retrieval` or `lexical_fallback`. The header is informational; list bodies remain `SchemeCard[]`.
+- `POST /schemes/ask` retrieves up to five chunks. If embedding access fails after model/dimension and database schema checks, deterministic lexical ranking uses actual current stored chunks with the same state/category filters. It never creates scheme records or embeddings. The first tool trace is `lexical_fallback`, and any extractive/grounded answer includes a visible lexical-retrieval label. Existing `mode` values remain unchanged for frontend compatibility.
+- Missing embedding model/dimension configuration and invalid database vector schema still return 503; a configured provider's outage or absent API key can use stored-text fallback. Database exceptions retain sanitized existing 503 errors; they are not masked as empty results. Plain listing never calls a model.
+- Lexical ranking uses Unicode word terms, light English plural normalization, document-frequency weighting and title boosts over at most 200 current candidate chunks. Strong stored title/acronym matches restrict named-scheme results. Lexical scores are not cosine scores, confidence or eligibility percentages. This is bounded fallback for the small reviewed corpus, not a quality claim about semantic retrieval.
+- Only actual active chunks whose source URL matches the stored scheme source can be cited. Malformed stored passage metadata is skipped. Complete-paragraph and exact URL/chunk-ID validation remain in force. Common instruction-injection markers quarantine a passage before generation or extractive fallback; this conservative guard is not a complete injection detector. Source text remains untrusted data under separate trusted provider instructions.
+- Ingestion validates the entire corpus before writing, checks vector batch length/dimensions, and safely upserts within the existing per-scheme transactions/advisory locks. `clean-paragraph-v2` content-derived chunk IDs keep changed/superseded evidence inactive instead of replacing old cited text. An authorized first reingestion creates the new chunk identities and may incur embedding cost; exact reruns reuse them. No migrations or live ingestion run automatically.
+
+See [the implementation report](developer-a-phase-1-rag.md) and [captured local API responses](phase-1-rag-examples.json). Live PostgreSQL/pgvector/provider checks remain blocked by missing configuration.
+
+## Single-agent boundary (Phase 3)
+
+`POST /api/agent/message` accepts a trimmed 3–1000-character message. Optional session/scheme IDs are UUIDs. Profile fields use the deterministic eligibility schema; no age/income is inferred from free text. Optional `complaint` contains only user-supplied `title` (up to 250 characters), `description` (up to 5000), `locality` (up to 250) and an existing category code or null. No browser role, user ID, status, government reference or executable tool/action is accepted. Unexpected fields return 422.
+
+The public endpoint accepts guest questions. If a bearer token is supplied, existing JWT verification must succeed; invalid tokens return 401. Private complaint reads additionally resolve the verified user's stored profile and reuse Developer B's scoped list function. An absent established identity produces a sign-in suggestion, never private data. Session IDs are opaque correlation values echoed/generated for the current browser conversation; there is no server conversation store or authorization lookup by session ID.
+
+Intents keep the planned lowercase contract: `scheme` (SCHEME), `complaint` (COMPLAINT), `mixed` (MIXED) and `clarify` (AMBIGUOUS). Structured model output can choose only an intent, not a tool, permission, identity or narrative. When the classifier fails/unconfigured, conservative explicit-term routing is labelled in the trace. Source text and messages are untrusted data.
+
+`AgentStatus` is `ok | partial | needs_info | unavailable`. Complaint analysis returns labelled keyword suggestions and an editable draft with unchanged supplied text; related suggestions are owner-scoped and are not confirmed duplicates. Provider-independent suggestions do not authorize writes. Scheme insufficiency/ambiguity produces uncertainty; all failed scheme tools without a useful result return sanitized 503 `AGENT_TOOLS_UNAVAILABLE`. Existing database configuration/outage errors remain sanitized 503s. Provider timeouts/errors are handled without disclosing raw errors or credential values.
+
+`AgentAction` extends the planned `ToolTrace` fields `{tool,status,detail}` with `{label,path,requires_confirmation,draft?}`. Paths are restricted to `/schemes`, `/complaints/new`, `/requests`. Complaint proposals always require confirmation; a proposal is not an executed write. Draft actions transfer only editable text into the existing complaint form. Creating an internal ticket still requires its separate authenticated review/confirmation. Agent tools cannot create/update/delete complaints, send messages, submit to government portals or assert registration. Ticket reads distinguish internal status from unverified citizen-reported government references.
+
+Agent citations retain scheme identity/title, official URL, review date, exact excerpt and evidence kind. Retrieved evidence also includes actual chunk IDs; rule-source citations from deterministic eligibility have no invented chunk ID. The evidence gate checks active stored chunks, scheme/source correspondence, complete paragraphs, response text, review metadata and source-injection markers. Formatting reconstructs permitted source answers rather than accepting arbitrary model claims. Structured eligibility results remain separate and use only stored rules.
+
+The endpoint shares the existing public model request/concurrency budget. It uses one finite LangGraph workflow with no write tools, checkpointer or server-side chat persistence; optional third-party tracing is disabled for this graph. The frontend stores temporary history in provider memory, prevents simultaneous sends, retains text on failure and clears history/pending results/draft transfers on account change. The browser allows up to 160 seconds for sequential bounded provider work; no mutation is retried automatically.
+
+See [Day 1 handoff](dev-a-day1-handoff.md) and [actual local agent responses](phase-3-agent-examples.json). Those captures predate the final complaint-analysis update. Hosted integration gates remain unverified; see the final release-readiness report.
+
+
+## Final authentication and complaint update (2026-11-10)
+
+This section supersedes historical statements that complaint analysis is unavailable. No existing write or scheme contracts were removed.
+
+Citizen signup, password login, verification emails, password recovery and authenticated password updates use the existing Supabase JavaScript SDK directly. Signup sends no role metadata. FastAPI still verifies the provider JWT and provisions only a citizen profile; operator-managed officer roles are preserved. Configure the public SPA origin and both `/auth/callback` and `/auth/reset` redirect URLs in Supabase. Enable email confirmation as required and configure SMTP and provider abuse controls. Password recovery uses the SDK's `PASSWORD_RECOVERY` event and authenticated `updateUser`; URL fragments are processed by the SDK. No custom plaintext password store or authentication bypass is added to the application. The local E2E Auth double is test-only.
+
+`POST /api/complaints/analyze` requires a verified citizen. Input is optional title (max 250), required description (10-5000), optional locality (max 250), with no client identity/status fields. Output is `{category, description, suggested_department, method, related_complaints, notice}`. Category is one of the existing five values. `method` is `deterministic_keywords`, explicitly not a model-quality or official routing claim; ambiguous matches return `other`. Description is unchanged. Related suggestions query only the verified owner's latest 50 records, require the same locality and category and conservative word overlap, and return at most three `{id,title,reason}` objects. These are not confirmed duplicates and never expose other users' complaints. Analysis does not write records, merge complaints or prevent manual submission. The existing agent uses this same service; guests receive category suggestions without private records, and complaint creation still requires authenticated review/confirmation.
+
+`PATCH /api/complaints/{id}/official-ref` retains owner-only authorization and a single transaction with its audit event. `official_channel` accepts `CPGRAMS`, `CONNECT_PUNJAB`, `OTHER_OFFICIAL` or null. `official_submitted_on` is an ISO date no later than today's date in India. Omitted metadata fields preserve existing values for legacy clients; explicit null clears optional metadata. References reject control characters; all API text rejects NUL characters. Complaint responses add nullable `official_channel` and `official_submitted_on` while preserving `official_ref`, `official_status`, internal `status` and event history. Supplying a reference implies only `USER_REPORTED_FILED`, never verified acknowledgment. Opening a portal changes no status. Users can follow the verified CPGRAMS status link manually.
+
+Apply additive migration `004_official_filing_metadata.sql` through `python -m app.scripts.migrate` before deploying this version. The runner applies 001, 003 and 004 before schema validation, in its existing transaction; migration 002 remains separate and unchanged. No production migration was executed during local verification. Migration 004 adds nullable fields and constraints without deleting or replacing complaint history.
+
+
+## Integrated analysis contract (2026-11-12)
+
+Exactly one authenticated `POST /api/complaints/analyze` combines both developers' contracts. Input retains optional title/locality and description 5-5000 characters (the form still requires 10), boundary trimming, NUL rejection and forbidden client identity/role fields. It returns all of `{category, department, confidence, urgency_level, duplicates, mode, description, suggested_department, method, related_complaints, notice}`. Developer B's weighted bilingual keyword classifier and composite title/description/locality similarity are the shared implementation; the older analysis module remains a compatibility adapter for agent callers. `confidence` and `similarity_score` are uncalibrated heuristic values, not probabilities, verified department routing or official urgency decisions. UI suggestions require local confirmation and leave manual categories editable.
+
+Private duplicate candidate queries require the verified owner's ID. Guests cannot call this endpoint; guest agent classification has no private duplicate results. No public/cross-user duplicate listing is retained. Both duplicate response arrays contain only owner-accessible records. Automatic debounced form alerts use the authenticated client and abort/ignore obsolete responses without overwriting manually selected categories; explicit analysis and review-before-save remain available. Analysis errors do not block basic creation. Existing GET complaint filters and the officer-only filtered queue are retained, as are official filing metadata and atomic audit events. Historical evaluation artifacts are preserved; they are not new live-integration claims.
+
+
+## Final-fix integration compatibility
+
+The finite LangGraph navigator, complete authentication recovery, official filing metadata and three-photo durable private evidence workflow are preserved. The focused citizen chat remains `/api/agent/conversation`; optional LLM complaint advice remains `/api/complaints/ai-advice`; bounded quick screening remains `/api/schemes/screen`. Officer internal category routing, event-derived notifications, persistent in-session drafts, source validation and bounded list pagination are retained. Evidence uses migration 005 and authenticated `/content` reads; the earlier conflicting evidence migration is retired and not executed. Live Supabase and OpenAI acceptance remains pending.

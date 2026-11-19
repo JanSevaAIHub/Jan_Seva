@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { ComplaintFeedback } from '../components/complaints/ComplaintFeedback'
-import { EvidencePanel } from '../components/complaints/EvidencePanel'
+import { ComplaintEvidence } from '../components/complaints/ComplaintEvidence'
 
 export function TrackStatus() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -64,6 +64,7 @@ export function TrackStatus() {
         </p>
       </div>
 
+      <Link to="/requests" className="text-sm font-semibold text-violet-700">My Complaints: view all saved requests</Link>
       {/* Search Bar Card */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center gap-3">
@@ -133,6 +134,7 @@ export function TrackStatus() {
               </p>
             </div>
 
+            <ComplaintEvidence key={`${session?.user.id}:${selectedTicket.id}`} complaintId={selectedTicket.id} />
             <div className="grid grid-cols-2 gap-3 text-xs pt-1">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-[11px] text-slate-400 block mb-0.5">Officer assignment</span>
@@ -160,8 +162,6 @@ export function TrackStatus() {
               </div>
             </div>
 
-            <EvidencePanel key={`${session?.user.id}-${selectedTicket.id}`} ticket={selectedTicket} />
-
             {selectedTicket.officerNotes && (
               <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-xs text-indigo-950">
                 <span className="font-bold block mb-1">Nodal Officer Note:</span>
@@ -173,6 +173,9 @@ export function TrackStatus() {
               <span className="text-slate-500 block">Government filing (separate from internal status)</span>
               <span className="font-semibold">{selectedTicket.officialStatus}</span>
               {selectedTicket.officialRef && <p>User-provided reference: {selectedTicket.officialRef} (unverified)</p>}
+              {selectedTicket.officialChannel && <p>Filing channel: {selectedTicket.officialChannel.replaceAll('_', ' ')}</p>}
+              {selectedTicket.officialSubmittedOn && <p>Reported submission date: {selectedTicket.officialSubmittedOn}</p>}
+              <a href="https://pgportal.gov.in/Status" target="_blank" rel="noopener noreferrer" className="block mt-2 text-violet-700 underline">Track on Government Website (CPGRAMS)</a>
             </div>
 
             <button
@@ -234,7 +237,7 @@ export function TrackStatus() {
         </div>
       ) : (
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
-          No request selected. Enter an ID above to track status.
+          No request selected. Choose a saved complaint from My Complaints or enter its ID.
         </div>
       )}
     </div>

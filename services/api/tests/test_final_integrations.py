@@ -57,8 +57,8 @@ def test_analysis_related_tickets_only_include_authenticated_owners_records(clie
     other = {'Authorization':'Bearer '+tokens(profiles['other_citizen'].user_id)}
     own_id = client.post('/api/complaints',json=draft,headers=owner).json()['id']
     other_id = client.post('/api/complaints',json=draft,headers=other).json()['id']
-    monkeypatch.setattr(complaints,'analyze_complaint',lambda *_: {'category':'road','draft':draft['description'], 'department':'Roads Dept','next_action':'Review first','notice':'Not submitted','mode':'ai_suggestion'})
-    result = client.post('/api/complaints/analyze',json={k:v for k,v in draft.items() if k!='category'},headers=owner)
+    monkeypatch.setattr(complaints,'analyze_ai_complaint',lambda *_: {'category':'road','draft':draft['description'], 'department':'Roads Dept','next_action':'Review first','notice':'Not submitted','mode':'ai_suggestion'})
+    result = client.post('/api/complaints/ai-advice',json={k:v for k,v in draft.items() if k!='category'},headers=owner)
     assert result.status_code == 200
     assert [c['id'] for c in result.json()['similar_complaints']] == [own_id]
     assert other_id not in result.text
@@ -117,7 +117,7 @@ def test_navigator_uses_integrated_complaint_ai_without_writing(monkeypatch, db_
     monkeypatch.setattr(agent_tools, 'analyze_civic_problem', lambda *_: {
         'category':'road', 'draft':'Synthetic AI-assisted facts for review.', 'notice':'Editable AI suggestion only. Nothing submitted.'})
     request=AgentMessage(message='Help prepare a road complaint')
-    capability=agent_tools.analyze_complaint(db_session,request)
+    capability=agent_tools.optional_ai_advice(request)
     assert capability['available'] is True
     draft=agent_tools.draft_complaint(request,capability['advice'])
     assert draft.category=='road' and draft.description=='Synthetic AI-assisted facts for review.'
@@ -129,7 +129,7 @@ def test_navigator_reports_missing_complaint_provider_truthfully(monkeypatch, db
     from app.ai.agent_schemas import AgentMessage
     monkeypatch.setattr(agent_tools, 'analyze_civic_problem', lambda *_: (_ for _ in ()).throw(ConfigurationError('OPENAI_API_KEY is absent')))
     request=AgentMessage(message='Help prepare a road complaint')
-    capability=agent_tools.analyze_complaint(db_session,request)
+    capability=agent_tools.optional_ai_advice(request)
     assert capability['available'] is False and 'unavailable' in capability['detail']
     assert 'not implemented' not in capability['detail']
     assert agent_tools.draft_complaint(request).description==request.message

@@ -1,13 +1,13 @@
-"""Application models. Supabase owns auth.users; the app never creates it."""
+"""Five core models. Supabase owns auth.users; the application never creates it."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 import math
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey,
-    ForeignKeyConstraint, Integer, JSON, String, Table, Text, Uuid, func,
+    Boolean, CheckConstraint, Column, Date, DateTime, Enum, ForeignKey,
+    ForeignKeyConstraint, Integer, JSON, String, Table, Text, UniqueConstraint, Uuid, func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
@@ -127,7 +127,12 @@ class SchemeChunk(Base):
 
 class Complaint(Base):
     __tablename__ = "complaints"
-    __table_args__ = (CheckConstraint("length(trim(title)) > 0", name="complaints_title_nonempty"),)
+    __table_args__ = (
+        CheckConstraint("length(trim(title)) > 0", name="complaints_title_nonempty"),
+        UniqueConstraint('user_id', 'submission_key', name='complaints_submission_key'),
+        CheckConstraint("official_channel IS NULL OR official_channel IN ('CPGRAMS', 'CONNECT_PUNJAB', 'OTHER_OFFICIAL')", name="complaints_official_channel"),
+        CheckConstraint("official_ref IS NOT NULL OR (official_channel IS NULL AND official_submitted_on IS NULL)", name="complaints_filing_requires_reference"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="RESTRICT"), index=True)
@@ -138,10 +143,13 @@ class Complaint(Base):
     status: Mapped[InternalStatus] = mapped_column(enum_type(InternalStatus, "complaints_status"), default=InternalStatus.LOCAL_SUBMITTED, server_default="LOCAL_SUBMITTED", index=True)
     assigned_officer_id: Mapped[UUID | None] = mapped_column(ForeignKey("profiles.user_id", ondelete="SET NULL"), index=True)
     official_ref: Mapped[str | None] = mapped_column(String(250))
+    official_channel: Mapped[str | None] = mapped_column(String(30))
+    official_submitted_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     seed_key: Mapped[str | None] = mapped_column(String(100), unique=True)
+    submission_key: Mapped[UUID | None] = mapped_column(Uuid)
     owner: Mapped[Profile] = relationship(back_populates="complaints", foreign_keys=[user_id])
     assigned_officer: Mapped[Profile | None] = relationship(back_populates="assigned_complaints", foreign_keys=[assigned_officer_id])
     events: Mapped[list["ComplaintEvent"]] = relationship(back_populates="complaint", order_by="ComplaintEvent.event_time", passive_deletes=True)
@@ -165,29 +173,37 @@ class ComplaintEvent(Base):
     actor: Mapped[Profile] = relationship()
 
 
-class ComplaintSubmission(Base):
-    __tablename__ = "complaint_submissions"
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="RESTRICT"), primary_key=True)
-    request_key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    complaint_id: Mapped[UUID] = mapped_column(ForeignKey("complaints.id", ondelete="RESTRICT"), unique=True)
-    fingerprint: Mapped[str] = mapped_column(String(64))
-
-
 class ComplaintEvidence(Base):
-    __tablename__ = "complaint_evidence"
+    __tablename__ = 'complaint_evidence'
     __table_args__ = (
-        CheckConstraint("size_bytes > 0", name="evidence_size_positive"),
-        CheckConstraint("mime_type IN ('image/jpeg', 'image/png', 'image/webp')", name="evidence_mime_allowed"),
+        UniqueConstraint('complaint_id', 'slot', name='complaint_evidence_slot'),
+        UniqueConstraint('complaint_id', 'upload_key', name='complaint_evidence_upload_key'),
+        CheckConstraint('slot BETWEEN 1 AND 3', name='complaint_evidence_slot_range'),
+        CheckConstraint("state IN ('PENDING', 'READY', 'DELETE_PENDING')", name='complaint_evidence_state'),
+        CheckConstraint("extension IN ('jpg', 'png', 'webp')", name='complaint_evidence_extension'),
+        CheckConstraint('size_bytes > 0 AND size_bytes <= 5242880', name='complaint_evidence_size'),
     )
-    # One optional photograph per complaint; replaces atomically at metadata level.
-    complaint_id: Mapped[UUID] = mapped_column(ForeignKey("complaints.id", ondelete="RESTRICT"), primary_key=True)
-    id: Mapped[UUID] = mapped_column(Uuid, default=uuid4, unique=True)
-    object_path: Mapped[str] = mapped_column(String(250), unique=True)
-    filename: Mapped[str] = mapped_column(String(120))
-    mime_type: Mapped[str] = mapped_column(String(30))
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    complaint_id: Mapped[UUID] = mapped_column(ForeignKey('complaints.id', ondelete='RESTRICT'), index=True)
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey('profiles.user_id', ondelete='RESTRICT'))
+    upload_key: Mapped[UUID] = mapped_column(Uuid)
+    slot: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(14), default='PENDING')
+    extension: Mapped[str] = mapped_column(String(4))
+    content_type: Mapped[str] = mapped_column(String(20))
     size_bytes: Mapped[int] = mapped_column(Integer)
-    sha256: Mapped[str] = mapped_column(String(64))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    original_filename: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    @property
+    def filename(self):
+        return self.original_filename or f'evidence.{self.extension}'
 
-CORE_TABLES = [Profile.__table__, Scheme.__table__, SchemeChunk.__table__, Complaint.__table__, ComplaintEvent.__table__, ComplaintSubmission.__table__, ComplaintEvidence.__table__]
+    @property
+    def object_path(self):
+        return f'{self.uploaded_by}/{self.complaint_id}/{self.id}.{self.extension}'
+
+
+CORE_TABLES = [Profile.__table__, Scheme.__table__, SchemeChunk.__table__, Complaint.__table__, ComplaintEvent.__table__, ComplaintEvidence.__table__]

@@ -3,7 +3,7 @@ import { X, ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, UserChe
 import { useApp } from '../../context/AppContext'
 import { NEXT_STATUS, CATEGORY_LABELS, DEPARTMENTS } from '../../lib/complaints'
 import { useDialog } from '../../lib/useDialog'
-import { EvidencePanel } from '../complaints/EvidencePanel'
+import { ComplaintEvidence } from '../complaints/ComplaintEvidence'
 
 export function TicketDetailModal() {
   const { officerTicketModal, setOfficerTicketModal, updateComplaintStatus, updateComplaintRouting } = useApp()
@@ -34,7 +34,7 @@ export function TicketDetailModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-      <div 
+      <div
         className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 flex flex-col"
         role="dialog"
         ref={dialogRef}
@@ -83,7 +83,7 @@ export function TicketDetailModal() {
             </div>
           </div>
 
-          <EvidencePanel key={officerTicketModal.id} ticket={officerTicketModal} />
+          <ComplaintEvidence key={officerTicketModal.id} complaintId={officerTicketModal.id} />
           <details className="text-xs space-y-2 border-t pt-3">
             <summary className="font-bold text-violet-700 cursor-pointer">Review department routing</summary>
             <p className="mt-2">Change the internal category and recommended department. This records an audit event; government referral remains a separate action.</p>

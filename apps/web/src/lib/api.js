@@ -18,9 +18,10 @@ export function onUnauthorized(listener) {
 
 async function request(path, accessToken, options = {}) {
   if (!path.startsWith('/') || path.startsWith('//')) throw new ApiError('Invalid API path.', 0, 'INVALID_PATH')
-  const { body, headers, signal, timeoutMs = /\/ask$|\/message$|\/conversation$|\/analyze$/.test(path) ? 100000 : path.includes('/evidence') ? 60000 : 15000, ...rest } = options
+  const { body, headers, signal, responseType = 'json', timeoutMs = /\/ask$|\/message$|\/conversation$|\/analyze$/.test(path) ? 160000 : path.includes('/evidence') ? 60000 : 15000, ...rest } = options
+  const binary = typeof Blob !== 'undefined' && body instanceof Blob
   const method = (rest.method || 'GET').toUpperCase()
-  if (!['GET', 'POST', 'PATCH'].includes(method)) throw new ApiError('Unsupported API method.', 0, 'INVALID_METHOD')
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(method)) throw new ApiError('Unsupported API method.', 0, 'INVALID_METHOD')
   const controller = new AbortController()
   const cancel = () => controller.abort()
   let timedOut = false
@@ -30,11 +31,15 @@ async function request(path, accessToken, options = {}) {
   try {
     const response = await fetch(`${apiBaseUrl}/api${path}`, {
       ...rest, method, signal: controller.signal,
-      headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      headers: { Accept: responseType === 'blob' ? 'image/jpeg,image/png,image/webp' : 'application/json', ...(body !== undefined ? { 'Content-Type': binary ? body.type : 'application/json' } : {}),
         ...headers, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
-      ...(body !== undefined ? { body: typeof body === 'string' || body instanceof Blob ? body : JSON.stringify(body) } : {}),
+      ...(body !== undefined ? { body: binary || typeof body === 'string' ? body : JSON.stringify(body) } : {}),
     })
     if (response.status === 204) return null
+    if (response.ok && responseType === 'blob') {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(response.headers.get('content-type')?.split(';')[0])) throw new ApiError('Invalid evidence image response.', response.status, 'INVALID_IMAGE')
+      return await response.blob()
+    }
     const raw = await response.text()
     let data
     try { data = raw ? JSON.parse(raw) : null } catch { data = undefined }

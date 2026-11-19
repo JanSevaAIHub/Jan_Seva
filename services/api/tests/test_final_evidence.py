@@ -53,7 +53,7 @@ def storage(monkeypatch):
 
         def upload(self, path, data, mime):
             if self.failure:
-                raise StorageError('Isolated storage permission failure')
+                raise evidence.fail('STORAGE_UNAVAILABLE', 'Isolated storage permission failure', 503)
             self.objects[path] = (data, mime)
 
         def signed_url(self, path):
@@ -64,12 +64,16 @@ def storage(monkeypatch):
         def cleanup(self, path):
             self.deleted.append(path)
             self.objects.pop(path, None)
-    monkeypatch.setattr(evidence, 'EvidenceStorage', MemoryStorage)
+    MemoryStorage.put = MemoryStorage.upload
+    MemoryStorage.read = lambda self,path: self.objects[path][0]
+    MemoryStorage.delete = MemoryStorage.cleanup
+    monkeypatch.setattr(evidence, 'get_storage', MemoryStorage)
+    monkeypatch.setattr(evidence, 'storage_access_guard', lambda _: None)
     return MemoryStorage
 
 
 @pytest.mark.parametrize('fmt,mime', [('JPEG','image/jpeg'), ('PNG','image/png'), ('WEBP','image/webp')])
-def test_upload_real_decoded_image_metadata_reload_and_signed_access(client, saved, db_session, storage, fmt, mime):
+def test_upload_real_decoded_image_metadata_reload_and_authenticated_access(client, saved, db_session, storage, fmt, mime):
     ticket, headers = saved
     response = client.post(f'/api/complaints/{ticket}/evidence', content=photo(fmt),
         headers={**headers, 'Content-Type': mime, 'X-Filename': '..%2F..%2Fcitizen-photo.' + fmt.lower()})
@@ -82,8 +86,9 @@ def test_upload_real_decoded_image_metadata_reload_and_signed_access(client, sav
     assert record.object_path in storage.objects
     metadata = client.get(f'/api/complaints/{ticket}/evidence', headers=headers)
     assert metadata.json()[0]['id'] == data['id'] and metadata.headers['cache-control'] == 'private, no-store'
-    access = client.get(f"/api/complaints/{ticket}/evidence/{data['id']}/access", headers=headers)
-    assert access.status_code == 200 and access.json()['expires_in'] == 300
+    access = client.get(f"/api/complaints/{ticket}/evidence/{data['id']}/content", headers=headers)
+    assert access.status_code == 200 and access.headers['cache-control'] == 'private, no-store'
+    assert client.get(f"/api/complaints/{ticket}/evidence/{data['id']}/content").status_code == 401
     assert 'object_path' not in metadata.text and 'service_role' not in metadata.text
 
 
@@ -92,7 +97,7 @@ def test_upload_real_decoded_image_metadata_reload_and_signed_access(client, sav
 def test_invalid_disguised_mismatched_and_empty_images_rejected(client, saved, storage, content, mime):
     ticket, headers = saved
     result = client.post(f'/api/complaints/{ticket}/evidence', content=content, headers={**headers, 'Content-Type': mime})
-    assert result.status_code == 422 and not storage.objects
+    assert result.status_code == (415 if mime == 'image/svg+xml' else 413 if not content else 422) and not storage.objects
 
 
 def test_oversized_image_rejected_while_streaming(client, saved, storage, monkeypatch):
@@ -116,7 +121,7 @@ def test_private_metadata_and_access_denied(client, saved, storage, profiles, to
     uploaded = client.post(f'/api/complaints/{ticket}/evidence', content=photo(), headers={**owner, 'Content-Type':'image/png'}).json()
     headers = {} if who == 'anonymous' else {'Authorization':'Bearer '+tokens(profiles[who].user_id)}
     assert client.get(f'/api/complaints/{ticket}/evidence', headers=headers).status_code == status
-    assert client.get(f"/api/complaints/{ticket}/evidence/{uploaded['id']}/access", headers=headers).status_code == status
+    assert client.get(f"/api/complaints/{ticket}/evidence/{uploaded['id']}/content", headers=headers).status_code == status
 
 
 def test_storage_failure_keeps_complaint_then_retry_creates_one_evidence(client, saved, storage, db_session):
@@ -125,7 +130,7 @@ def test_storage_failure_keeps_complaint_then_retry_creates_one_evidence(client,
     result = client.post(f'/api/complaints/{ticket}/evidence', content=photo(), headers={**headers,'Content-Type':'image/png'})
     assert result.status_code == 503
     assert client.get(f'/api/complaints/{ticket}', headers=headers).status_code == 200
-    assert db_session.scalar(select(func.count()).select_from(ComplaintEvidence)) == 0
+    assert db_session.scalar(select(ComplaintEvidence)).state == 'PENDING'
     storage.failure = False
     assert client.post(f'/api/complaints/{ticket}/evidence', content=photo(), headers={**headers,'Content-Type':'image/png'}).status_code == 201
     assert db_session.scalar(select(func.count()).select_from(Complaint)) == 1
@@ -139,8 +144,10 @@ def test_optional_photo_absent_and_replacement_deduplication(client, saved, stor
     repeated = client.post(url, content=photo(), headers={**headers,'Content-Type':'image/png'}).json()
     assert first['id'] == repeated['id'] and len(storage.objects) == 1
     replacement = client.post(url, content=photo('JPEG'), headers={**headers,'Content-Type':'image/jpeg'}).json()
-    assert replacement['id'] != first['id'] and len(storage.objects) == 1 and len(storage.deleted) == 1
-    assert client.get(f"{url}/{first['id']}/access", headers=headers).status_code == 404
+    assert replacement['id'] != first['id'] and len(storage.objects) == 2
+    assert client.delete(f"{url}/{first['id']}", headers=headers).status_code == 204
+    assert len(storage.objects) == 1 and len(storage.deleted) == 1
+    assert client.get(f"{url}/{first['id']}/content", headers=headers).status_code == 404
 
 
 def test_failed_metadata_commit_cleans_uploaded_object(client, saved, storage, db_session, monkeypatch):
@@ -149,7 +156,7 @@ def test_failed_metadata_commit_cleans_uploaded_object(client, saved, storage, d
         patch.setattr(db_session, 'commit', lambda: (_ for _ in ()).throw(SQLAlchemyError('isolated commit failure')))
         with pytest.raises(SQLAlchemyError):
             client.post(f'/api/complaints/{ticket}/evidence', content=photo(), headers={**headers,'Content-Type':'image/png'})
-    assert not storage.objects and storage.deleted
+    assert not storage.objects  # Pending metadata commits before remote upload, so no object needs cleanup.
     assert db_session.scalar(select(func.count()).select_from(ComplaintEvidence)) == 0
 
 

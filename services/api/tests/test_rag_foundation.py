@@ -73,8 +73,13 @@ def test_pgvector_column_dimensions_are_checked(monkeypatch, dimensions, column)
     ("What documents are required for Sukanya Samriddhi Yojana?", "ssy"),
     ("Can a person from Haryana without Punjab domicile apply for Punjab Ashirwad?", "punjab-ashirwad"),
     ("Tell me about the Galactic Farming Grant, a scheme not in the database.", None),
+    ("Atal Pension Yojana (APY) eligibility", "apy"),
+    ("Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY) insurance", "pmjjby"),
+    ("Pradhan Mantri Suraksha Bima Yojana (PMSBY) insurance", "pmsby"),
+    ("Pradhan Mantri Vishwakarma artisan assistance", "pm-vishwakarma"),
+    ("Indira Gandhi National Widow Pension Scheme (IGNWPS)", "ignwps"),
 ])
-def test_five_questions_retrieve_real_stored_sources(db_session, stored_corpus, question, expected):
+def test_ten_questions_retrieve_real_stored_sources(db_session, stored_corpus, question, expected):
     found = retrieval.lexical_retrieve(db_session, question)
     assert len(found) <= 5
     if expected is None:

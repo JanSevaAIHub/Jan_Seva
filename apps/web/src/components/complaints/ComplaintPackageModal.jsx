@@ -7,12 +7,16 @@ export function ComplaintPackageModal() {
   const { packageModalComplaint, setPackageModalComplaint, addToast, saveOfficialReference, currentUser } = useApp()
   const [copied, setCopied] = useState(false)
   const [officialRefInput, setOfficialRefInput] = useState('')
+  const [channel, setChannel] = useState('')
+  const [submittedOn, setSubmittedOn] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const dialogRef = useDialog(Boolean(packageModalComplaint), () => setPackageModalComplaint(null), saving)
   useEffect(() => {
     setOfficialRefInput(packageModalComplaint?.officialRef || '')
+    setChannel(packageModalComplaint?.officialChannel || '')
+    setSubmittedOn(packageModalComplaint?.officialSubmittedOn || '')
     setCopied(false)
     setError('')
   }, [packageModalComplaint?.id])
@@ -23,6 +27,7 @@ export function ComplaintPackageModal() {
 INTERNAL TRACKING ID: ${packageModalComplaint.id}
 DATE GENERATED: ${new Date().toLocaleDateString()}
 CATEGORY: ${packageModalComplaint.category}
+SUGGESTED AUTHORITY (confirm jurisdiction): ${({ road: 'Local roads authority', water: 'Local water or drainage authority', streetlight: 'Local public-lighting authority', sanitation: 'Local sanitation authority' })[packageModalComplaint.categoryCode] || 'Confirm the responsible authority for your locality'}
 OFFICER ASSIGNMENT: ${packageModalComplaint.department || 'Not recorded'}
 LOCATION: ${packageModalComplaint.locality}
 
@@ -55,7 +60,7 @@ OFFICIAL FILING CHANNELS:
     setSaving(true)
     setError('')
     try {
-      await saveOfficialReference(packageModalComplaint.id, officialRefInput.trim())
+      await saveOfficialReference(packageModalComplaint.id, officialRefInput.trim(), { official_channel: channel || null, official_submitted_on: submittedOn || null })
       setPackageModalComplaint(null)
     } catch (error) { setError(error.message) }
     finally { setSaving(false) }
@@ -117,7 +122,7 @@ OFFICIAL FILING CHANNELS:
               <a
                 href="https://pgportal.gov.in"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-violet-300 hover:bg-violet-50/50 transition-all text-xs font-semibold text-slate-800"
               >
                 <span>CPGRAMS National Portal</span>
@@ -126,7 +131,7 @@ OFFICIAL FILING CHANNELS:
               <a
                 href="https://connect.punjab.gov.in"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-violet-300 hover:bg-violet-50/50 transition-all text-xs font-semibold text-slate-800"
               >
                 <span>Connect Punjab Portal</span>
@@ -135,13 +140,24 @@ OFFICIAL FILING CHANNELS:
             </div>
           </div>
 
+          <p className="text-xs text-slate-600">Your JanSeva complaint is already saved. Opening a portal does not submit it or change its filing status. Return to My Complaints at any time.</p>
+          <p className="text-xs text-slate-600">Evidence checklist: gather relevant dates and optional photos privately for the official portal. No attachments are stored with this ticket.</p>
           {/* Optional Official Reference Input */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-            <label className="text-xs font-bold text-slate-700 block">
+            <label htmlFor="official-reference" className="text-xs font-bold text-slate-700 block">
               Already filed officially? Record Government Reference ID
+            </label>
+            <label className="block text-xs font-semibold">Official filing channel
+              <select value={channel} disabled={currentUser.role !== 'citizen' || saving} onChange={e => setChannel(e.target.value)} className="block w-full border rounded-lg p-2 mt-1">
+                <option value="">Not specified</option><option value="CPGRAMS">CPGRAMS</option><option value="CONNECT_PUNJAB">Connect Punjab</option><option value="OTHER_OFFICIAL">Other official channel</option>
+              </select>
+            </label>
+            <label className="block text-xs font-semibold">Official submission date (optional)
+              <input type="date" value={submittedOn} disabled={currentUser.role !== 'citizen' || saving} onChange={e => setSubmittedOn(e.target.value)} className="block w-full border rounded-lg p-2 mt-1" />
             </label>
             <div className="flex gap-2">
               <input
+                id="official-reference"
                 type="text"
                 value={officialRefInput}
                 maxLength={250}

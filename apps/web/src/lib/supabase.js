@@ -9,7 +9,7 @@ let client = null
 let configurationError = ''
 try {
   if (url && key) client = createClient(url, key, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   })
   else configurationError = 'Sign-in is not configured. Set the public Supabase URL and key.'
 } catch {

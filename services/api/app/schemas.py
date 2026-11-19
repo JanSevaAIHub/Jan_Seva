@@ -1,16 +1,25 @@
 """Validated API boundary models; server-owned identity/status fields are not inputs."""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from app.models import ComplaintCategory, InternalStatus, Role
 
 
 class APIModel(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid", str_strip_whitespace=True)
+
+    @field_validator('*', mode='before')
+    @classmethod
+    def reject_nul_text(cls, value):
+        # PostgreSQL text cannot store U+0000. Reject at the boundary rather
+        # than failing a valid-looking complaint during its database write.
+        if isinstance(value, str) and '\x00' in value:
+            raise ValueError('Text must not contain NUL characters')
+        return value
 
 
 class HealthResponse(BaseModel):
@@ -34,6 +43,22 @@ class Profile(APIModel):
     occupation: str | None = Field(default=None, max_length=100)
 
 
+class ProfileUpdate(APIModel):
+    name: str = Field(min_length=1, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=100)
+    occupation: str | None = Field(default=None, min_length=2, max_length=100)
+
+
+class EvidenceSummary(APIModel):
+    id: UUID
+    complaint_id: UUID
+    state: Literal['PENDING', 'READY', 'DELETE_PENDING']
+    content_type: str
+    filename: str
+    size_bytes: int
+    created_at: datetime
+
+
 class Scheme(APIModel):
     id: UUID
     title: str = Field(min_length=1, max_length=250)
@@ -52,6 +77,12 @@ class ComplaintCreate(APIModel):
     locality: str = Field(min_length=2, max_length=250)
 
 
+class ComplaintAnalysisInput(APIModel):
+    title: str = Field(default="", max_length=250)
+    description: str = Field(min_length=10, max_length=5000)
+    locality: str = Field(default="", max_length=250)
+
+
 class ComplaintSummary(APIModel):
     id: UUID
     user_id: UUID
@@ -61,6 +92,8 @@ class ComplaintSummary(APIModel):
     status: InternalStatus
     assigned_officer_id: UUID | None
     official_ref: str | None
+    official_channel: str | None = None
+    official_submitted_on: date | None = None
     created_at: datetime
     updated_at: datetime
     is_synthetic: bool
@@ -90,3 +123,64 @@ class ComplaintStatusUpdate(APIModel):
 class OfficialReferenceUpdate(APIModel):
     official_ref: str = Field(min_length=1, max_length=250)
 
+
+    official_channel: Literal["CPGRAMS", "CONNECT_PUNJAB", "OTHER_OFFICIAL"] | None = None
+    official_submitted_on: date | None = None
+
+    @field_validator("official_ref")
+    @classmethod
+    def safe_reference(cls, value):
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("Reference must not contain control characters")
+        return value
+
+    @field_validator("official_submitted_on")
+    @classmethod
+    def no_future_filing(cls, value):
+        today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+        if value is not None and value > today:
+            raise ValueError("Submission date cannot be in the future")
+        return value
+
+
+class DuplicateComplaintMatch(APIModel):
+    id: UUID
+    title: str
+    locality: str
+    category: ComplaintCategory
+    status: InternalStatus
+    similarity_score: float = Field(ge=0, le=1)
+    created_at: datetime
+
+
+class ComplaintAnalyzeRequest(ComplaintAnalysisInput):
+    """Shared validated input for both existing analysis callers."""
+    description: str = Field(min_length=5, max_length=5000)
+    locality: str | None = Field(default="", max_length=250)
+
+    @field_validator('title')
+    @classmethod
+    def supported_title(cls, value):
+        if value and len(value) < 2:
+            raise ValueError('Use at least two characters or leave the title unspecified')
+        return value
+
+
+class RelatedComplaintSuggestion(APIModel):
+    id: UUID
+    title: str
+    reason: str
+
+
+class ComplaintAnalyzeResponse(APIModel):
+    category: ComplaintCategory
+    department: str
+    confidence: float = Field(ge=0, le=1)
+    urgency_level: Literal["Low", "Medium", "High"]
+    duplicates: list[DuplicateComplaintMatch] = Field(default_factory=list)
+    mode: str = "keyword_classifier"
+    description: str
+    suggested_department: str
+    method: str = "deterministic_keywords"
+    related_complaints: list[RelatedComplaintSuggestion] = Field(default_factory=list)
+    notice: str

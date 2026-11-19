@@ -5,9 +5,11 @@ import { schemeView, schemeAnswer, eligibilityResult } from '../lib/schemes'
 import { agentReply } from '../lib/agent'
 import { complaintInput, complaintView, ticketNotifications, DEPARTMENTS } from '../lib/complaints'
 
+import { createCitizenAccount, citizenProfile, sendResetEmail, changePassword, friendlyAuthError } from '../lib/auth'
+
 const AppContext = createContext(null)
 const GUEST = { name: 'Guest', role: 'guest', avatar: '?', completeness: 0 }
-const EMPTY_DRAFT = { title: '', category: 'Streetlight & Public Lighting', description: '', locality: '', priority: 'Medium', photo: null }
+const EMPTY_DRAFT = { title: '', category: 'Streetlight & Public Lighting', description: '', locality: '', priority: 'Medium', photo: null, evidenceFiles: [] }
 
 export function AppProvider({ children }) {
   // Only the authenticated API profile establishes the current account role.
@@ -17,6 +19,7 @@ export function AppProvider({ children }) {
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState('')
   const [loginRole, setLoginRole] = useState(null)
+  const [authMode, setAuthMode] = useState('login')
   const accountVersion = useRef(0)
   const identityVersion = useRef(0)
   const listVersion = useRef(0)
@@ -219,7 +222,8 @@ export function AppProvider({ children }) {
   // The auth subscription only updates React state; API calls run outside its lock.
   useEffect(() => {
     if (!supabase) return
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') { setAuthMode('reset'); setLoginRole('citizen') }
       const token = nextSession?.access_token || null
       if (sessionToken.current === token) return
       sessionToken.current = token
@@ -274,7 +278,10 @@ export function AppProvider({ children }) {
     setComplaintsLoading(true)
     setComplaintsError('')
     try {
-      const profile = await apiRequest('/me', session.access_token)
+      let profile = await apiRequest('/me', session.access_token)
+      if (profile?.name === 'Citizen' && session.user.user_metadata?.name) {
+        profile = await apiRequest('/me', session.access_token, {method:'PATCH',body:citizenProfile(session.user.user_metadata)})
+      }
       if (!isCurrent()) return
       if (!profile || typeof profile.name !== 'string' || typeof profile.user_id !== 'string' ||
         (profile.occupation != null && typeof profile.occupation !== 'string') ||
@@ -348,7 +355,7 @@ export function AppProvider({ children }) {
       const fingerprint = JSON.stringify(payload)
       if (submissionKey.current?.fingerprint !== fingerprint) submissionKey.current = { fingerprint, key: crypto.randomUUID() }
       const saved = await apiRequest('/complaints', session?.access_token, {
-        method: 'POST', body: JSON.stringify(payload), headers: { 'Idempotency-Key': submissionKey.current.key },
+        method: 'POST', body: JSON.stringify(payload), headers: { 'Idempotency-Key': draft.submissionKey || submissionKey.current.key },
       })
       if (version !== identityVersion.current) return null
       const ticket = applyComplaint(saved)
@@ -371,7 +378,7 @@ export function AppProvider({ children }) {
     setPendingEvidence({ ticketId, file, state: 'uploading', error: '' })
     try {
       await apiRequest(`/complaints/${ticketId}/evidence`, session?.access_token, {
-        method: 'POST', body: file, headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
+        method: 'POST', body: file, headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name), 'Idempotency-Key': crypto.randomUUID() },
       })
       if (version !== identityVersion.current) return false
       setPendingEvidence({ ticketId, file: null, state: 'uploaded', error: '' })
@@ -423,10 +430,10 @@ export function AppProvider({ children }) {
     return ticket
   }
 
-  const saveOfficialReference = async (id, officialRef) => {
+  const saveOfficialReference = async (id, officialRef, metadata = {}) => {
     const version = identityVersion.current
     const saved = await apiRequest(`/complaints/${id}/official-ref`, session?.access_token, {
-      method: 'PATCH', body: JSON.stringify({ official_ref: officialRef }),
+      method: 'PATCH', body: JSON.stringify({ official_ref: officialRef, ...metadata }),
     })
     if (version !== identityVersion.current) throw new Error('The account changed. Please reopen the ticket.')
     applyComplaint(saved)
@@ -528,7 +535,7 @@ export function AppProvider({ children }) {
   }
 
   // Selecting a persona opens sign-in. Only /api/me establishes its role.
-  const switchUserRole = newRole => { setAuthError(''); setLoginRole(newRole) }
+  const switchUserRole = newRole => { setAuthError(''); setAuthMode('login'); setLoginRole(newRole) }
   const signIn = async (email, password) => {
     setAuthBusy(true)
     setAuthError('')
@@ -537,9 +544,22 @@ export function AppProvider({ children }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       return true
-    } catch (error) { setAuthError(error.message); return false }
+    } catch (error) { setAuthError(friendlyAuthError(error)); return false }
     finally { setAuthBusy(false) }
   }
+  const runAuthAction = async action => {
+    if (authBusy) return null
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      if (!supabase) throw new Error(authConfigurationError)
+      return await action()
+    } catch (error) { setAuthError(friendlyAuthError(error)); return null }
+    finally { setAuthBusy(false) }
+  }
+  const signUp = (email, password, fields) => runAuthAction(() => createCitizenAccount(supabase, email, password, window.location.origin, fields))
+  const requestPasswordReset = email => runAuthAction(() => sendResetEmail(supabase, email, window.location.origin))
+  const resetPassword = password => runAuthAction(() => changePassword(supabase, password))
   const signOut = async () => {
     if (!supabase || authBusy) return
     setAuthBusy(true)
@@ -547,23 +567,9 @@ export function AppProvider({ children }) {
       const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) throw error
       clearAccount()
-      setComplaintDraft(EMPTY_DRAFT)
-      draftOwner.current = null
       setAuthError('')
       setComplaintsError('')
     } catch { setAuthError('Sign-out failed. Check your connection and try again.'); addToast('Sign-out failed. Please retry.', 'warning') }
-    finally { setAuthBusy(false) }
-  }
-
-  const signUp = async (email, password) => {
-    setAuthBusy(true)
-    setAuthError('')
-    try {
-      if (!supabase) throw new Error(authConfigurationError)
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) throw error
-      return { ok: true, confirmationRequired: !data.session }
-    } catch (error) { setAuthError(error.message); return { ok: false } }
     finally { setAuthBusy(false) }
   }
 
@@ -576,6 +582,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         currentUser,
+        authMode, setAuthMode, clearAuthError: () => setAuthError(''), requestPasswordReset, resetPassword,
         invalidateSchemeSearch, schemeProfile, updateSchemeProfile, eligibility, checkEligibility,
         profileEditing, setProfileEditing, activeCitation, setActiveCitation,
         agentMessages, agentError, agentTyping, sendAgentMessage, agentComplaintDraft, setAgentComplaintDraft,

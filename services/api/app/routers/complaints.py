@@ -2,28 +2,27 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-import hashlib
-import json
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import accessible_complaint, get_current_user, require_citizen, visible_complaints
-from app.config import get_settings
-from app.db import get_db
-from app.models import Complaint, ComplaintEvent, ComplaintSubmission, InternalStatus, Profile, Role
-from app.ai.assistant import analyze_complaint
+from app.ai.assistant import analyze_complaint as analyze_ai_complaint
 from app.ai.provider import ProviderError
 from app.config import ConfigurationError
 from app.schemas import APIModel
-from app.routers.schemes import model_request_budget
 from pydantic import Field
 from difflib import SequenceMatcher
+from app.routers.schemes import model_request_budget
+from app.ai.complaint_classifier import analyze_complaint_submission
+from app.auth import accessible_complaint, get_current_user, require_citizen, visible_complaints
+from app.config import get_settings
+from app.db import get_db
+from app.models import Complaint, ComplaintEvent, InternalStatus, Profile, Role
 from app.schemas import ComplaintCreate, ComplaintDetail, OfficialReferenceUpdate
+from app.schemas import ComplaintAnalyzeRequest, ComplaintAnalyzeResponse
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
-
 
 class ComplaintAnalysisRequest(APIModel):
     title: str = Field(min_length=3, max_length=250)
@@ -37,10 +36,10 @@ def duplicate_score(title: str, locality: str, other_title: str, other_locality:
     return SequenceMatcher(None, title.strip().casefold(), other_title.strip().casefold()).ratio()
 
 
-@router.post("/analyze", dependencies=[Depends(model_request_budget)])
+@router.post("/ai-advice", dependencies=[Depends(model_request_budget)])
 def complaint_analysis(data: ComplaintAnalysisRequest, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
     try:
-        advice = analyze_complaint(data.title, data.description, data.locality)
+        advice = analyze_ai_complaint(data.title, data.description, data.locality)
     except (ConfigurationError, ProviderError) as error:
         raise HTTPException(503, detail={"code": "AI_UNAVAILABLE", "message": "Complaint AI is not configured. Keep editing your draft or retry later." if isinstance(error, ConfigurationError) else "Complaint AI is unavailable. Keep editing your draft or retry."}) from None
     recent = db.scalars(visible_complaints(user).order_by(Complaint.created_at.desc()).limit(100)).all()
@@ -50,9 +49,26 @@ def complaint_analysis(data: ComplaintAnalysisRequest, user: Profile = Depends(r
     return advice
 
 
+
+@router.post("/analyze", response_model=ComplaintAnalyzeResponse)
+def analyze_complaint(data: ComplaintAnalyzeRequest, user: Profile = Depends(require_citizen), db: Session = Depends(get_db)):
+    return analyze_complaint_submission(db, data, verified_user_id=user.user_id)
+
+
 def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
     settings = get_settings()
     citizen_id, officer_id = settings.demo_citizen_user_id, settings.demo_officer_user_id
+    # Explicit server-side demo routing for newly registered citizens. The
+    # existing citizen/officer pair takes precedence when it is configured.
+    if settings.demo_assignment_enabled and (not citizen_id or str(citizen.user_id) != citizen_id):
+        try:
+            default_id = UUID(settings.demo_default_officer_user_id)
+        except ValueError:
+            raise HTTPException(503, detail={'code': 'ASSIGNMENT_NOT_CONFIGURED', 'message': 'Configure the approved demo officer before enabling demo assignment.'}) from None
+        officer = db.get(Profile, default_id)
+        if officer is None or officer.role != Role.OFFICER:
+            raise HTTPException(503, detail={'code': 'ASSIGNMENT_NOT_CONFIGURED', 'message': 'The approved demo officer needs an officer profile.'})
+        return default_id
     if not citizen_id and not officer_id:
         return None
     try:
@@ -70,44 +86,52 @@ def demo_assignee(db: Session, citizen: Profile) -> UUID | None:
 @router.post("", response_model=ComplaintDetail, status_code=201)
 def create_complaint(data: ComplaintCreate, user: Profile = Depends(require_citizen), db: Session = Depends(get_db),
                      idempotency_key: UUID | None = Header(default=None)):
-    fingerprint = hashlib.sha256(json.dumps(data.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
+    def existing_submission():
+        saved = db.scalar(select(Complaint).where(Complaint.user_id == user.user_id, Complaint.submission_key == idempotency_key))
+        if saved is not None and any(getattr(saved, name) != value for name, value in data.model_dump().items()):
+            raise HTTPException(409, detail={'code': 'SUBMISSION_CONFLICT', 'message': 'This submission attempt already saved different details. Open My Requests before submitting again.'})
+        return saved
 
-    def replay():
-        previous = db.get(ComplaintSubmission, (user.user_id, idempotency_key))
-        if previous is None:
-            return None
-        if previous.fingerprint != fingerprint:
-            raise HTTPException(409, detail={"code": "SUBMISSION_KEY_REUSED", "message": "This submission key belongs to a different draft. Start a new submission."})
-        return accessible_complaint(db, user, previous.complaint_id)
-
-    if idempotency_key and (previous := replay()) is not None:
-        return previous
+    if idempotency_key is not None:
+        saved = existing_submission()
+        if saved is not None:
+            return saved
     complaint = Complaint(**data.model_dump(), user_id=user.user_id,
+                          submission_key=idempotency_key,
                           assigned_officer_id=demo_assignee(db, user), status=InternalStatus.LOCAL_SUBMITTED)
     complaint.events.append(ComplaintEvent(actor_id=user.user_id, old_status=None,
         new_status=InternalStatus.LOCAL_SUBMITTED, note="Citizen created an internal JanSeva ticket; no government filing."))
     db.add(complaint)
     try:
-        db.flush()
-        if idempotency_key:
-            db.add(ComplaintSubmission(user_id=user.user_id, request_key=idempotency_key,
-                complaint_id=complaint.id, fingerprint=fingerprint))
         db.commit()
     except IntegrityError:
         db.rollback()
-        if idempotency_key and (previous := replay()) is not None:
-            return previous
+        if idempotency_key is not None:
+            saved = existing_submission()
+            if saved is not None:
+                return saved
         raise
     db.refresh(complaint)
     return complaint
 
 
 @router.get("", response_model=list[ComplaintDetail])
-def list_complaints(status: InternalStatus | None = None, user: Profile = Depends(get_current_user), db: Session = Depends(get_db),
-                    limit: int = Query(default=100, ge=1, le=100), offset: int = Query(default=0, ge=0, le=100000)):
+def list_complaints(
+    status: InternalStatus | None = None,
+    category: str | None = None,
+    locality: str | None = None,
+    user: Profile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=100000),
+):
     query = visible_complaints(user).options(selectinload(Complaint.events)).order_by(Complaint.created_at.desc(), Complaint.id)
     if status is not None:
         query = query.where(Complaint.status == status)
+    if category is not None and category.strip():
+        query = query.where(Complaint.category == category.strip().lower())
+    if locality is not None and locality.strip():
+        query = query.where(Complaint.locality.ilike(f"%{locality.strip()}%"))
     return db.scalars(query.limit(limit).offset(offset)).all()
 
 
@@ -123,6 +147,10 @@ def record_official_reference(complaint_id: UUID, data: OfficialReferenceUpdate,
     if complaint is None:
         raise HTTPException(404, detail={"code": "COMPLAINT_NOT_FOUND", "message": "Complaint not found."})
     complaint.official_ref = data.official_ref
+    # Omitted optional fields retain previously recorded metadata for old clients.
+    for field in ("official_channel", "official_submitted_on"):
+        if field in data.model_fields_set:
+            setattr(complaint, field, getattr(data, field))
     complaint.events.append(ComplaintEvent(actor_id=user.user_id, old_status=complaint.status,
         new_status=complaint.status, note="Citizen recorded an unverified government filing reference; internal status unchanged."))
     db.commit()
